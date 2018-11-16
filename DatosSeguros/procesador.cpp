@@ -5,9 +5,17 @@ Procesador * Procesador::instancia = NULL;
 Procesador::Procesador( QObject * parent ) : QObject( parent ),
                                              max_features( 500 ),
                                              goodMatchPercent( 0.15f ),
-                                             tipoCarnet( NONE )
+                                             tipoCarnet( NONE ),
+                                             ocr( new tesseract::TessBaseAPI )
 {
-    this->configurarImageAlignment();
+
+
+    // Initialize tesseract to use Spanish (spa) and the LSTM OCR engine.
+    ocr->Init( NULL, "spa", tesseract::OEM_LSTM_ONLY );
+
+    // Set Page segmentation mode to PSM_AUTO (3)
+    ocr->SetPageSegMode( tesseract::PSM_AUTO );
+
 }
 
 Procesador * Procesador::getInstancia()  {
@@ -28,6 +36,13 @@ Procesador::TipoCarnet Procesador::queEs(cv::Mat &imParaPreguntarQueEs)
     return NONE;
 }
 
+/**
+ * @brief Procesador::configurarImageAlignment
+ *
+ * Se usa para configurar los parametros para la alineacion de los carnets y su imagen de referencia para features.
+ *
+ * Se debe llamar este metodo por cada tipo de carnet, para que pueda alinear a cada uno
+ */
 void Procesador::configurarImageAlignment( TipoCarnet tipoCarnet,
                                            QString archivoReferencia,
                                            int max_features,
@@ -69,20 +84,20 @@ void Procesador::configurarImageAlignment( TipoCarnet tipoCarnet,
  * @param im1Reg Es la imagen im1 alineada
  * @param h Es la matriz de transformacion
  */
-void Procesador::alinear( cv::Mat & imParaAlinear, cv::Mat & imAlineada, TipoCarnet tipoCarnet )  {
+void Procesador::alinear( const cv::Mat & imParaAlinear, cv::Mat & imAlineada, TipoCarnet tipoCarnet )  {
 
     // Convert images to grayscale
     cv::Mat im1Gray, im2Gray;
-    cv::cvtColor( imParaAlinear, im1Gray, CV_BGR2GRAY );
+    cv::cvtColor( imParaAlinear, im1Gray, CV_RGB2GRAY );
 
     if ( tipoCarnet == DNI )  {
-        cv::cvtColor( this->imReferenciaDNI, im2Gray, CV_BGR2GRAY );
+        cv::cvtColor( this->imReferenciaDNI, im2Gray, CV_RGB2GRAY );
     }
     else if ( tipoCarnet == LICENCIA )  {
-        cv::cvtColor( this->imReferenciaLicencia, im2Gray, CV_BGR2GRAY );
+        cv::cvtColor( this->imReferenciaLicencia, im2Gray, CV_RGB2GRAY );
     }
     else if ( tipoCarnet == VERDE )  {
-        cv::cvtColor( this->imReferenciaVerde, im2Gray, CV_BGR2GRAY );
+        cv::cvtColor( this->imReferenciaVerde, im2Gray, CV_RGB2GRAY );
     }
     else  {
         return;
@@ -156,6 +171,190 @@ void Procesador::alinear( cv::Mat & imParaAlinear, cv::Mat & imAlineada, TipoCar
 }
 
 /**
+ * @brief Procesador::extraerInfo Devuelve la info en este orden:
+ * DNI - Apellido - Nombre - Domicilio - Fecha de nac. - Fecha de otorg. - Fecha de venc. - Clase
+ * Este metodo guarda en la carpeta /imagenes/registros una imagen con la imParaProcesar con rectangulos rojos
+ * de donde se extrae la informacion (incluida la foto y la firma).
+ *
+ * La imagen debe estar previamente alineada
+ *
+ * @return
+ */
+QStringList Procesador::extraerInfo( const cv::Mat & imParaProcesar,
+                                     cv::Mat & imConRectangulos,
+                                     Procesador::TipoCarnet tipoCarnet )
+{
+    QStringList textoExtraido;
+    int sizeBordeRectangulo = 3;
+
+    if ( tipoCarnet == DNI )  {
+
+
+    }
+    else if ( tipoCarnet == LICENCIA )  {
+
+        imConRectangulos = imParaProcesar.clone();
+
+        cv::Mat imDni = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.213514 ),
+                              cv::Point( imParaProcesar.cols * 0.573034, imParaProcesar.rows * 0.265766 ) ) );
+
+        // Le damos la imagen para identificar texto y ejecuta el OCR con GetUTF8Text
+        ocr->SetImage( imDni.data, imDni.cols, imDni.rows, 3, imDni.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        // Dibuja el rectangulo para registrar la region de la cual fue extraida la informacion
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.213514 ),
+                       cv::Point( imParaProcesar.cols * 0.573034, imParaProcesar.rows * 0.265766 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imApellido = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.313514 ),
+                              cv::Point( imParaProcesar.cols * 0.814607, imParaProcesar.rows * 0.369369 ) ) );
+
+        ocr->SetImage( imApellido.data, imApellido.cols, imApellido.rows, 3, imApellido.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.313514 ),
+                       cv::Point( imParaProcesar.cols * 0.814607, imParaProcesar.rows * 0.369369 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imNombre = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.412613 ),
+                              cv::Point( imParaProcesar.cols * 0.712360, imParaProcesar.rows * 0.470270 ) ) );
+
+        ocr->SetImage( imNombre.data, imNombre.cols, imNombre.rows, 3, imNombre.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.412613 ),
+                       cv::Point( imParaProcesar.cols * 0.712360, imParaProcesar.rows * 0.470270 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+        cv::Mat imDomicilio = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.509009 ),
+                              cv::Point( imParaProcesar.cols * 0.969101, imParaProcesar.rows * 0.552252 ) ) );
+
+        ocr->SetImage( imDomicilio.data, imDomicilio.cols, imDomicilio.rows, 3, imDomicilio.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.509009 ),
+                       cv::Point( imParaProcesar.cols * 0.969101, imParaProcesar.rows * 0.552252 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+        cv::Mat imFechaNac = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.654955 ),
+                              cv::Point( imParaProcesar.cols * 0.585955, imParaProcesar.rows * 0.712613 ) ) );
+
+        ocr->SetImage( imFechaNac.data, imFechaNac.cols, imFechaNac.rows, 3, imFechaNac.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.654955 ),
+                       cv::Point( imParaProcesar.cols * 0.585955, imParaProcesar.rows * 0.712613 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+        cv::Mat imFechaOtorg = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.757658 ),
+                              cv::Point( imParaProcesar.cols * 0.599438, imParaProcesar.rows * 0.812613 ) ) );
+
+        ocr->SetImage( imFechaOtorg.data, imFechaOtorg.cols, imFechaOtorg.rows, 3, imFechaOtorg.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.328652, imParaProcesar.rows * 0.757658 ),
+                       cv::Point( imParaProcesar.cols * 0.599438, imParaProcesar.rows * 0.812613 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+        cv::Mat imFechaVenc = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.657303, imParaProcesar.rows * 0.752252 ),
+                              cv::Point( imParaProcesar.cols * 0.995506, imParaProcesar.rows * 0.815915 ) ) );
+
+        ocr->SetImage( imFechaVenc.data, imFechaVenc.cols, imFechaVenc.rows, 3, imFechaVenc.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.657303, imParaProcesar.rows * 0.752252 ),
+                       cv::Point( imParaProcesar.cols * 0.995506, imParaProcesar.rows * 0.815915 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+//        cv::Mat imFoto = imParaProcesar(
+//                    cv::Rect( cv::Point( imParaProcesar.cols * 0.013483, imParaProcesar.rows * 0.184685 ),
+//                              cv::Point( imParaProcesar.cols * 0.325843, imParaProcesar.rows * 0.806306 ) ) );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.013483, imParaProcesar.rows * 0.184685 ),
+                       cv::Point( imParaProcesar.cols * 0.318843, imParaProcesar.rows * 0.806306 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imClase = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.919663, imParaProcesar.rows * 0.215315 ),
+                              cv::Point( imParaProcesar.cols * 0.994944, imParaProcesar.rows * 0.279279 ) ) );
+
+        ocr->SetImage( imClase.data, imClase.cols, imClase.rows, 3, imClase.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.919663, imParaProcesar.rows * 0.215315 ),
+                       cv::Point( imParaProcesar.cols * 0.994944, imParaProcesar.rows * 0.279279 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::imwrite( "../imagenes/registros/rectangulos.jpg", imConRectangulos );
+
+    }
+    else if ( tipoCarnet == VERDE )  {
+
+
+    }
+    else  {
+        return QStringList();
+    }
+
+    return textoExtraido;
+}
+
+/**
+ * @brief Procesador::extraerFoto Extra una imagen solo de la foto.
+ * La imagen debe estar previamente alineada.
+ * Guarda en la carpeta registros la foto.
+ *
+ * @return Retorna un QImage que sera la foto de la paersona
+ */
+void Procesador::extraerFoto( const cv::Mat &imParaProcesar, cv::Mat & imFotoPerfil, Procesador::TipoCarnet tipoCarnet )
+{
+    if ( tipoCarnet == DNI )  {
+
+
+    }
+    else if ( tipoCarnet == LICENCIA )  {
+
+        cv::Mat imFoto = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.013483, imParaProcesar.rows * 0.184685 ),
+                              cv::Point( imParaProcesar.cols * 0.318843, imParaProcesar.rows * 0.806306 ) ) );
+
+        imFotoPerfil = imFoto.clone();
+
+    }
+    else if ( tipoCarnet == VERDE )  {
+
+
+    }
+}
+
+QImage Procesador::extraerFirma(cv::Mat &imParaProcesar, Procesador::TipoCarnet tipoCarnet)
+{
+    return QImage();
+}
+
+/**
  * @brief Procesador::alignImages Alinea las imagenes en base a una imagen de muestra.
  * @param im1 Es la imagen que se desea alinear
  * @param im2 Es la imagen de referencia
@@ -194,7 +393,7 @@ void Procesador::alignImages( cv::Mat & im1, cv::Mat & im2, cv::Mat & im1Reg, cv
   // Draw top matches
   cv::Mat imMatches;
   cv::drawMatches( im1, keypoints1, im2, keypoints2, matches, imMatches );
-  cv::imwrite( "../imagenes/matches.jpg", imMatches );
+  cv::imwrite( "../imagenes/registros/matches.jpg", imMatches );
 
 
   // Extract location of good matches

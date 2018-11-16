@@ -48,20 +48,6 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="1" colspan="4">
-    <widget class="QPushButton" name="pbTesseract">
-     <property name="text">
-      <string>Tesseract</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="5">
-    <widget class="QPushButton" name="pbAlinear">
-     <property name="text">
-      <string>Alinear</string>
-     </property>
-    </widget>
-   </item>
   </layout>
  </widget>
  <customwidgets>

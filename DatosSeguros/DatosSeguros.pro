@@ -36,13 +36,16 @@ SOURCES += \
     main.cpp \
     visor.cpp \ 
     principal.cpp \
-    procesador.cpp
+    procesador.cpp \
+    primeraentrega.cpp
 
 HEADERS += \
     visor.h \ 
     principal.h \
-    procesador.h
+    procesador.h \
+    primeraentrega.h
 
 FORMS += \
-    principal.ui
+    principal.ui \
+    primeraentrega.ui
 

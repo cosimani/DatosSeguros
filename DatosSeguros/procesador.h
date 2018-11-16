@@ -2,6 +2,8 @@
 #define PROCESADOR_H
 
 #include <QObject>
+#include <QImage>
+#include <QDebug>
 
 #include <string>
 #include <iostream>
@@ -37,7 +39,13 @@ public:
 
     void alignImages( cv::Mat & im1, cv::Mat & im2, cv::Mat & im1Reg, cv::Mat & h );
 
-    void alinear(cv::Mat &imParaAlinear, cv::Mat &imAlineada, TipoCarnet tipoCarnet = NONE);
+    void alinear(const cv::Mat &imParaAlinear, cv::Mat &imAlineada, TipoCarnet tipoCarnet = NONE );
+
+    QStringList extraerInfo( const cv::Mat & imParaProcesar, cv::Mat & imConRectangulos, TipoCarnet tipoCarnet = NONE );
+
+    void extraerFoto( const  cv::Mat &imParaProcesar, cv::Mat & imFotoPerfil, TipoCarnet tipoCarnet = NONE );
+
+    QImage extraerFirma( cv::Mat &imParaProcesar, TipoCarnet tipoCarnet = NONE );
 
 private:
     static Procesador * instancia;
@@ -51,6 +59,8 @@ private:
     cv::Mat imReferenciaDNI;
     cv::Mat imReferenciaLicencia;
     cv::Mat imReferenciaVerde;
+
+    tesseract::TessBaseAPI * ocr;
 
 signals:
 

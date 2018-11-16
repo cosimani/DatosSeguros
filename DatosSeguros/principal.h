@@ -4,9 +4,6 @@
 #include <QWidget>
 #include <QResizeEvent>
 
-#include <leptonica/allheaders.h>
-#include <tesseract/baseapi.h>
-
 #include <string>
 #include <iostream>
 
@@ -39,19 +36,12 @@ protected:
 private:
     Ui::Principal *ui;
 
-    tesseract::TessBaseAPI * ocr;
-
-    cv::Mat frame;
-
-    void alignImages( cv::Mat & im1, cv::Mat & im2, cv::Mat & im1Reg, cv::Mat & h );
 
     void alinear();
 
 private slots:
     void slot_encenderCamara();
     void slot_abrirDelDisco();
-    void slot_procesarTesseract();
-    void slot_alinear();
 };
 
 #endif // PRINCIPAL_H

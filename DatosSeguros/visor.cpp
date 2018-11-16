@@ -19,7 +19,6 @@ Visor::Visor( QWidget *parent ) : QLabel( parent ),
 
     connect( sceneTimer, SIGNAL( timeout() ), SLOT( slot_procesar() ) );
 
-
 }
 
 Visor::~Visor()
@@ -27,7 +26,7 @@ Visor::~Visor()
     videoCapture->release();
 }
 
-const Mat &Visor::getFrame()  {
+const Mat & Visor::getFrame()  {
     return frame;
 }
 
@@ -42,7 +41,10 @@ void Visor::iniciarCamara( int msTimer, int nroCamara )  {
     this->camaraActiva = true;
 }
 
-void Visor::setMat(cv::Mat im)
+/**
+ * @brief Visor::setMat Detiene la camara y el timer, y coloca el Mat dentro de slot_procesar
+ */
+void Visor::setMat( const cv::Mat & im )
 {
     sceneTimer->stop();
     this->camaraActiva = false;
@@ -51,7 +53,7 @@ void Visor::setMat(cv::Mat im)
         videoCapture->release();
 
     if ( ! im.empty() )  {
-        cvtColor( im, im, CV_BGR2RGB );
+//        cvtColor( im, im, CV_BGR2RGB );
         frame = im.clone();
     }
 
@@ -106,7 +108,7 @@ void Visor::slot_procesar()  {
                                                          frame.rows,
                                                          frame.step,
                                                          QImage::Format_RGB888
-                                                       ).scaled( this->width(), this->height() )
+                                                       ).scaled( this->width(), this->height() ).rgbSwapped()
                                                );
             this->setPixmap( pixmap );
         }

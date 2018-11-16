@@ -42,10 +42,8 @@ public:
 
     const cv::Mat& getFrame();
 
-
-
     void iniciarCamara( int msTimer, int nroCamara = 0 );
-    void setMat( cv::Mat im );
+    void setMat( const Mat &im );
     void setImagenDisco( QString archivo );
 
     bool getCamaraActiva() const;

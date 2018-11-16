@@ -1,5 +1,7 @@
 #include <QApplication>
-#include "principal.h"
+#include "primeraentrega.h"
+
+#include "procesador.h"
 
 int main(int argc, char *argv[])
 {
@@ -10,8 +12,13 @@ int main(int argc, char *argv[])
     // Al querer instanciar un objeto de tesseract::TessBaseAPI
     setlocale( LC_ALL, "C" );
 
-    Principal principal;
-    principal.showMaximized();
+    Procesador::getInstancia()->configurarImageAlignment( Procesador::LICENCIA,
+                                                          "../imagenes/referencias/LicenciaFrente.jpg" );
+
+    PrimeraEntrega principal;
+    principal.resize( 1050, 660 );
+    principal.show();
+
 
     return a.exec();
 }
