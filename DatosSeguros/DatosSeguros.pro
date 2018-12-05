@@ -11,7 +11,7 @@ QT += gui sql network
 CONFIG += c++11 console
 CONFIG -= app_bundle
 
-DEFINES += EJECUTADO_EN_SERVER
+#DEFINES += EJECUTADO_EN_SERVER
 
 
 #QT       += core gui sql network
@@ -44,54 +44,26 @@ unix:LIBS += $$DIR_OPENCV_LIBS/libleptonica.so
 
 
 include(QZXing/QZXing.pri)
-unix:LIBS += /home/cosimani/Proyecto/DatosSeguros/GitHub/librerias/libs/libQZXing.so.2.3.0
-INCLUDEPATH += /home/cosimani/Proyecto/DatosSeguros/GitHub/librerias/sources/zxing
+#unix:LIBS += /home/cosimani/Proyecto/DatosSeguros/GitHub/librerias/libs/libQZXing.so.2.3.0
+#INCLUDEPATH += /home/cosimani/Proyecto/DatosSeguros/GitHub/librerias/sources/zxing
 
 
 SOURCES += \
     main.cpp \
-    visor.cpp \ 
-    principal.cpp \
     procesador.cpp \
-    primeraentrega.cpp \
     webservice.cpp \
     config.cpp \
     logger.cpp \
-    database.cpp \
-    cliente.cpp \
-    CMJPEGServer.cpp \
-    CMJPEGClient.cpp \
-    CHTTPServer.cpp \
-    CImageUtilities.cpp \
-    CWebContext.cpp \
-    CSingletonPool.cpp \
-    CLargeMatrix.cpp \
-    CImageHistogram.cpp
+    database.cpp
 
 HEADERS += \
-    visor.h \ 
-    principal.h \
     procesador.h \
-    primeraentrega.h \
     webservice.h \
     config.h \
     logger.h \
-    database.h \
-    cliente.h \
-    CMJPEGServer.h \
-    CMJPEGClient.h \
-    CHTTPServer.h \
-    CImageUtilities.h \
-    CWebContext.h \
-    CSingletonPool.h \
-    CSingleton.h \
-    CLargeMatrix.h \
-    CImageHistogram.h
+    database.h
 
-FORMS += \
-    principal.ui \
-    primeraentrega.ui \
-    cliente.ui
+FORMS +=
 
 DISTFILES += \
     ../config/DatosSeguros.ini

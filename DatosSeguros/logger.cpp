@@ -3,6 +3,7 @@
 Logger* Logger::instance = NULL;
 
 QString Logger::out = CONSOLE;
+
 QFile* Logger::file = NULL;
 
 Logger::Logger(QObject *parent) :
@@ -10,9 +11,9 @@ Logger::Logger(QObject *parent) :
 {
 }
 
-Logger *Logger::getInstance()
+Logger * Logger::getInstance()
 {
-    if(!instance)
+    if( ! instance )
     {
         instance = new Logger();
         LOG_INF( "Logger: successfully initialized" );
@@ -43,55 +44,54 @@ void Logger::setFile(QFile *value)
 
 void Logger::log( QString text )
 {
-    if( getOut() == CONSOLE )
-    {
+    if( getOut() == CONSOLE )  {
         qDebug() << text;
         return;
     }
 
-    if( getFile() == NULL )
-    {
-        file = new QFile( getOut() + QDateTime::currentDateTime().toString() + LOG_FILE_EXT);
+    if( getFile() == NULL )  {
+        file = new QFile( getOut() + QDateTime::currentDateTime().toString() + ".log");
     }
 
-    if(!getFile()->isOpen())
+    if( ! getFile()->isOpen() )
     {
-        getFile()->open(QIODevice::ReadWrite);
+        getFile()->open( QIODevice::ReadWrite );
     }
 
-    if(getFile()->isOpen())
+    if( getFile()->isOpen() )
     {
-        QTextStream stream(getFile());
+        QTextStream stream( getFile() );
         stream << text << endl;
     }
     else
     {
         setOut( CONSOLE );
-        log(text);
+        log( text );
     }
 }
 
 void Logger::inf( QString text )
 {
-#ifndef SIN_DEBUG
     log( QString( PREF_INF + text ) );
-#endif
-    if( Database::getInstance()->databaseOk ) Database::getInstance()->log( text, LINF );
+
+    if( Database::getInstance()->databaseOk )  {
+        Database::getInstance()->log( text, LINF );
+    }
 }
 
 void Logger::war( QString text )
 {
-#ifndef SIN_DEBUG
     log( QString( PREF_WAR + text ) );
-#endif
-   if( Database::getInstance()->databaseOk ) Database::getInstance()->log( text, LWAR );
+
+    if( Database::getInstance()->databaseOk )  {
+        Database::getInstance()->log( text, LWAR );
+    }
 }
 
 void Logger::err( QString text )
 {
-#ifndef SIN_DEBUG
     log( QString( PREF_ERR + text ) );
-#endif
+
    if( Database::getInstance()->databaseOk )  {
        Database::getInstance()->log( text, LERR );
    }
@@ -101,6 +101,7 @@ void Logger::err( QString text )
 
 Logger::~Logger()
 {
+    file->close();
     delete file;
     delete instance;
 }

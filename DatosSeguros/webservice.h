@@ -1,5 +1,5 @@
-#ifndef ECHOSERVER_H
-#define ECHOSERVER_H
+#ifndef WEBSERVICE_H
+#define WEBSERVICE_H
 
 #include <QObject>
 #include <QList>
@@ -16,12 +16,8 @@
 
 #include <QZXing.h>
 
-
-
-
 class QTcpServer;
 class QTcpSocket;
-
 
 class WebService : public QObject  {
     Q_OBJECT
@@ -49,11 +45,10 @@ private slots:
     void processBinaryMessage( QByteArray message );
     void socketDisconnected();
 
-
 signals:
     void signal_solicitudRecibida( QByteArray );
     void signal_queryItems( QString, QUrlQuery );
     void signal_queryItems_and_image( QString, QUrlQuery, QImage );
 };
 
-#endif //ECHOSERVER_H
+#endif //WEBSERVICE_H

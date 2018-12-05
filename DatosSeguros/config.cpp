@@ -11,7 +11,6 @@ Config::Config( QObject * parent ) : QObject( parent )  {
 Config * Config::getInstance()  {
     if( ! instance )  {
         instance = new Config();
-        LOG_INF( "Config: successfully initialized" );
     }
     return instance;
 }
@@ -31,12 +30,13 @@ void Config::init()  {
 
 #else
 
-    QString inputFilePath = currentPath + CONFIG_DIR + "DatosSeguros" + CONFIG_FILE_EXT;
+//    QString inputFilePath = currentPath + CONFIG_DIR + "DatosSeguros" + CONFIG_FILE_EXT;
+    QString inputFilePath = "../config/DatosSeguros.ini";
 
 #endif
 
-    qDebug() << "El archivo .ini es" << inputFilePath;
-    qDebug() << "Raiz actual" << QDir::currentPath();
+//    qDebug() << "El archivo .ini es" << inputFilePath;
+//    qDebug() << "Raiz actual" << QDir::currentPath();
 
 //    qDebug() << inputFilePath;
 
