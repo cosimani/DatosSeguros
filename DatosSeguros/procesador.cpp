@@ -33,6 +33,7 @@ Procesador::~Procesador()  {
 
 Procesador::TipoCarnet Procesador::queEs(cv::Mat &imParaPreguntarQueEs)
 {
+    Q_UNUSED( imParaPreguntarQueEs );
     return NONE;
 }
 
@@ -103,19 +104,27 @@ void Procesador::alinear( const cv::Mat & imParaAlinear, cv::Mat & imAlineada, T
         return;
     }
 
+    cv::Ptr< cv::Feature2D > f2d = cv::xfeatures2d::SIFT::create();
+    //cv::Ptr<Feature2D> f2d = xfeatures2d::SURF::create();
+    //cv::Ptr<Feature2D> f2d = ORB::create();
+
     // Variables to store keypoints and descriptors
     std::vector< cv::KeyPoint > keypoints1, keypoints2;
     cv::Mat descriptors1, descriptors2;
 
     // Detect ORB features and compute descriptors.
-    cv::Ptr< cv::Feature2D > orb = cv::ORB::create( this->max_features );
-    orb->detectAndCompute(im1Gray, cv::Mat(), keypoints1, descriptors1);
-    orb->detectAndCompute(im2Gray, cv::Mat(), keypoints2, descriptors2);
+//    cv::Ptr< cv::Feature2D > f2d = cv::ORB::create( this->max_features );
+    f2d->detectAndCompute( im1Gray, cv::Mat(), keypoints1, descriptors1 );
+    f2d->detectAndCompute( im2Gray, cv::Mat(), keypoints2, descriptors2 );
 
     // Match features.
+//    std::vector< cv::DMatch > matches;
+//    cv::Ptr< cv::DescriptorMatcher > matcher = cv::DescriptorMatcher::create( "BruteForce-Hamming" );
+//    matcher->match( descriptors1, descriptors2, matches, cv::Mat() );
+
+    cv::BFMatcher matcher;
     std::vector< cv::DMatch > matches;
-    cv::Ptr< cv::DescriptorMatcher > matcher = cv::DescriptorMatcher::create( "BruteForce-Hamming" );
-    matcher->match( descriptors1, descriptors2, matches, cv::Mat() );
+    matcher.match( descriptors1, descriptors2, matches );
 
     // Sort matches by score
     std::sort( matches.begin(), matches.end() );
@@ -123,7 +132,6 @@ void Procesador::alinear( const cv::Mat & imParaAlinear, cv::Mat & imAlineada, T
     // Remove not so good matches
     const int numGoodMatches = matches.size() * this->goodMatchPercent;
     matches.erase( matches.begin() + numGoodMatches, matches.end() );
-
 
     // Draw top matches
     cv::Mat imMatches;
@@ -141,16 +149,24 @@ void Procesador::alinear( const cv::Mat & imParaAlinear, cv::Mat & imAlineada, T
         return;
     }
 
-    cv::imwrite( "../imagenes/matches.jpg", imMatches );
+#ifdef EJECUTADO_EN_SERVER
+    cv::imwrite( "imagenes/registros/matches.jpg", imMatches );
+#else
+    cv::imwrite( "../../imagenes/registros/matches.jpg", imMatches );
+#endif
 
     // Extract location of good matches
     std::vector< cv::Point2f > points1, points2;
 
     for( size_t i = 0; i < matches.size(); i++ )
     {
-    points1.push_back( keypoints1[ matches[i].queryIdx ].pt );
-    points2.push_back( keypoints2[ matches[i].trainIdx ].pt );
+        points1.push_back( keypoints1[ matches[i].queryIdx ].pt );
+        points2.push_back( keypoints2[ matches[i].trainIdx ].pt );
     }
+
+    // Si hay pocos puntos, retornamos porque findHomography tiraria error
+    if ( points1.size() < 4 || points2.size() < 4 )
+        return;
 
     // Find homography
     cv::Mat h = cv::findHomography( points1, points2, cv::RANSAC );
@@ -188,6 +204,120 @@ QStringList Procesador::extraerInfo( const cv::Mat & imParaProcesar,
     int sizeBordeRectangulo = 3;
 
     if ( tipoCarnet == DNI )  {
+
+        imConRectangulos = imParaProcesar.clone();
+
+        cv::Mat imDni = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.052147, imParaProcesar.rows * 0.902941 ),
+                              cv::Point( imParaProcesar.cols * 0.292025, imParaProcesar.rows * 0.973529 ) ) );
+
+        // Le damos la imagen para identificar texto y ejecuta el OCR con GetUTF8Text
+        ocr->SetImage( imDni.data, imDni.cols, imDni.rows, 3, imDni.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        // Dibuja el rectangulo para registrar la region de la cual fue extraida la informacion
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.052147, imParaProcesar.rows * 0.902941 ),
+                       cv::Point( imParaProcesar.cols * 0.292025, imParaProcesar.rows * 0.973529 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imApellido = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.367485, imParaProcesar.rows * 0.229412 ),
+                              cv::Point( imParaProcesar.cols * 0.560123, imParaProcesar.rows * 0.274510 ) ) );
+
+        ocr->SetImage( imApellido.data, imApellido.cols, imApellido.rows, 3, imApellido.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.367485, imParaProcesar.rows * 0.229412 ),
+                       cv::Point( imParaProcesar.cols * 0.560123, imParaProcesar.rows * 0.274510 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imNombre = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.365031, imParaProcesar.rows * 0.365686 ),
+                              cv::Point( imParaProcesar.cols * 0.666258, imParaProcesar.rows * 0.416667 ) ) );
+
+        ocr->SetImage( imNombre.data, imNombre.cols, imNombre.rows, 3, imNombre.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.365031, imParaProcesar.rows * 0.365686 ),
+                       cv::Point( imParaProcesar.cols * 0.666258, imParaProcesar.rows * 0.416667 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+        // Este es el dato "Sexo"
+        cv::Mat imDomicilio = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.365031, imParaProcesar.rows * 0.506863 ),
+                              cv::Point( imParaProcesar.cols * 0.401227, imParaProcesar.rows * 0.546078 ) ) );
+
+        ocr->SetImage( imDomicilio.data, imDomicilio.cols, imDomicilio.rows, 3, imDomicilio.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.365031, imParaProcesar.rows * 0.506863 ),
+                       cv::Point( imParaProcesar.cols * 0.401227, imParaProcesar.rows * 0.546078 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+        cv::Mat imFechaNac = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.368098, imParaProcesar.rows * 0.599020 ),
+                              cv::Point( imParaProcesar.cols * 0.621472, imParaProcesar.rows * 0.639216 ) ) );
+
+        ocr->SetImage( imFechaNac.data, imFechaNac.cols, imFechaNac.rows, 3, imFechaNac.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.368098, imParaProcesar.rows * 0.599020 ),
+                       cv::Point( imParaProcesar.cols * 0.621472, imParaProcesar.rows * 0.639216 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imFechaOtorg = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.367847, imParaProcesar.rows * 0.690196 ),
+                              cv::Point( imParaProcesar.cols * 0.615951, imParaProcesar.rows * 0.731373 ) ) );
+
+        ocr->SetImage( imFechaOtorg.data, imFechaOtorg.cols, imFechaOtorg.rows, 3, imFechaOtorg.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.367847, imParaProcesar.rows * 0.690196 ),
+                       cv::Point( imParaProcesar.cols * 0.615951, imParaProcesar.rows * 0.731373 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        cv::Mat imFechaVenc = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.367485, imParaProcesar.rows * 0.784314 ),
+                              cv::Point( imParaProcesar.cols * 0.626380, imParaProcesar.rows * 0.824510 ) ) );
+
+        ocr->SetImage( imFechaVenc.data, imFechaVenc.cols, imFechaVenc.rows, 3, imFechaVenc.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.367485, imParaProcesar.rows * 0.784314 ),
+                       cv::Point( imParaProcesar.cols * 0.626380, imParaProcesar.rows * 0.824510 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+
+//        cv::Mat imFoto = imParaProcesar(
+//                    cv::Rect( cv::Point( imParaProcesar.cols * 0.054601, imParaProcesar.rows * 0.223529 ),
+//                              cv::Point( imParaProcesar.cols * 0.352761, imParaProcesar.rows * 0.827451 ) ) );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.054601, imParaProcesar.rows * 0.223529 ),
+                       cv::Point( imParaProcesar.cols * 0.352761, imParaProcesar.rows * 0.827451 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
+
+        // Este es el dato "Ejemplar"
+        cv::Mat imClase = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.742331, imParaProcesar.rows * 0.509804 ),
+                              cv::Point( imParaProcesar.cols * 0.776687, imParaProcesar.rows * 0.545098 ) ) );
+
+        ocr->SetImage( imClase.data, imClase.cols, imClase.rows, 3, imClase.step );
+        textoExtraido << QString( ocr->GetUTF8Text() );
+
+        cv::rectangle( imConRectangulos,
+                       cv::Point( imParaProcesar.cols * 0.742331, imParaProcesar.rows * 0.509804 ),
+                       cv::Point( imParaProcesar.cols * 0.776687, imParaProcesar.rows * 0.545098 ),
+                       cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
 
 
     }
@@ -307,8 +437,6 @@ QStringList Procesador::extraerInfo( const cv::Mat & imParaProcesar,
                        cv::Point( imParaProcesar.cols * 0.994944, imParaProcesar.rows * 0.279279 ),
                        cv::Scalar( 0, 0, 255 ), sizeBordeRectangulo );
 
-        cv::imwrite( "../imagenes/registros/rectangulos.jpg", imConRectangulos );
-
     }
     else if ( tipoCarnet == VERDE )  {
 
@@ -332,6 +460,11 @@ void Procesador::extraerFoto( const cv::Mat &imParaProcesar, cv::Mat & imFotoPer
 {
     if ( tipoCarnet == DNI )  {
 
+        cv::Mat imFoto = imParaProcesar(
+                    cv::Rect( cv::Point( imParaProcesar.cols * 0.013483, imParaProcesar.rows * 0.184685 ),
+                              cv::Point( imParaProcesar.cols * 0.325843, imParaProcesar.rows * 0.806306 ) ) );
+
+        imFotoPerfil = imFoto.clone();
 
     }
     else if ( tipoCarnet == LICENCIA )  {
@@ -349,10 +482,10 @@ void Procesador::extraerFoto( const cv::Mat &imParaProcesar, cv::Mat & imFotoPer
     }
 }
 
-QImage Procesador::extraerFirma(cv::Mat &imParaProcesar, Procesador::TipoCarnet tipoCarnet)
-{
-    return QImage();
-}
+//QImage Procesador::extraerFirma(cv::Mat &imParaProcesar, Procesador::TipoCarnet tipoCarnet)
+//{
+//    return QImage();
+//}
 
 /**
  * @brief Procesador::alignImages Alinea las imagenes en base a una imagen de muestra.
@@ -393,7 +526,7 @@ void Procesador::alignImages( cv::Mat & im1, cv::Mat & im2, cv::Mat & im1Reg, cv
   // Draw top matches
   cv::Mat imMatches;
   cv::drawMatches( im1, keypoints1, im2, keypoints2, matches, imMatches );
-  cv::imwrite( "../imagenes/registros/matches.jpg", imMatches );
+  cv::imwrite( "../../imagenes/registros/matches.jpg", imMatches );
 
 
   // Extract location of good matches

@@ -1,30 +1,42 @@
 #ifndef PRIMERAENTREGA_H
 #define PRIMERAENTREGA_H
 
-#include <QWidget>
-#include <QResizeEvent>
+//#include <QWidget>
+//#include <QResizeEvent>
 
-namespace Ui {
-class PrimeraEntrega;
-}
+//#include "webservice.h"
 
-class PrimeraEntrega : public QWidget
-{
-    Q_OBJECT
+//#include "CMJPEGServer.h"
 
-public:
-    explicit PrimeraEntrega(QWidget *parent = 0);
-    ~PrimeraEntrega();
+//namespace Ui {
+//class PrimeraEntrega;
+//}
 
-private:
-    Ui::PrimeraEntrega *ui;
+//class PrimeraEntrega : public QWidget
+//{
+//    Q_OBJECT
 
-protected:
-    void resizeEvent( QResizeEvent * e );
+//public:
+//    explicit PrimeraEntrega(QWidget *parent = 0);
+//    ~PrimeraEntrega();
 
-private slots:
-    void slot_procesar();
-    void slot_elegirFoto();
-};
+//private:
+//    Ui::PrimeraEntrega *ui;
+//    WebService * webService;
+
+//    CMJPEGServer * jpegServer;
+
+//protected:
+//    void resizeEvent( QResizeEvent * e );
+
+
+//private slots:
+//    void slot_procesar();
+//    void slot_elegirFoto();
+
+//    void slot_enviarrFoto();
+
+//    void slot_procesarImagen(QString, QUrlQuery, QImage im);
+//};
 
 #endif // PRIMERAENTREGA_H

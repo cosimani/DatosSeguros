@@ -2,7 +2,7 @@
 #define PROCESADOR_H
 
 #include <QObject>
-#include <QImage>
+//#include <QImage>
 #include <QDebug>
 
 #include <string>
@@ -13,6 +13,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+
+#include <opencv2/xfeatures2d.hpp>
 
 #include <leptonica/allheaders.h>
 #include <tesseract/baseapi.h>
@@ -45,7 +47,7 @@ public:
 
     void extraerFoto( const  cv::Mat &imParaProcesar, cv::Mat & imFotoPerfil, TipoCarnet tipoCarnet = NONE );
 
-    QImage extraerFirma( cv::Mat &imParaProcesar, TipoCarnet tipoCarnet = NONE );
+//    QImage extraerFirma( cv::Mat &imParaProcesar, TipoCarnet tipoCarnet = NONE );
 
 private:
     static Procesador * instancia;

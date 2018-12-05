@@ -1,79 +1,137 @@
-#include "primeraentrega.h"
-#include "ui_primeraentrega.h"
+//#include "primeraentrega.h"
+//#include "ui_primeraentrega.h"
 
-#include "procesador.h"
-#include <QDebug>
-#include <QFileDialog>
+//#include "procesador.h"
+//#include "config.h"
+//#include <QDebug>
+//#include <QFileDialog>
 
-PrimeraEntrega::PrimeraEntrega(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::PrimeraEntrega)
-{
-    ui->setupUi(this);
+//PrimeraEntrega::PrimeraEntrega(QWidget *parent) :
+//    QWidget(parent),
+//    ui(new Ui::PrimeraEntrega)
+//{
+//    ui->setupUi(this);
 
-    connect( ui->pbElegirFoto, SIGNAL( pressed() ), this, SLOT( slot_elegirFoto() ) );
-    connect( ui->pbProcesar, SIGNAL( pressed() ), this, SLOT( slot_procesar() ) );
+//    webService = new WebService( this );
 
-    ui->visorFotoPerfil->setFixedSize( 150, 200 );
-    ui->gbInfo->setFixedWidth( 300 );
-}
+//    webService->iniciar( Config::getInstance()->getString( "puerto_tcp" ).toInt() );
 
-PrimeraEntrega::~PrimeraEntrega()
-{
-    delete ui;
-}
+//    connect( ui->pbElegirFoto, SIGNAL( pressed() ), this, SLOT( slot_elegirFoto() ) );
+//    connect( ui->pbProcesar, SIGNAL( pressed() ), this, SLOT( slot_procesar() ) );
 
-void PrimeraEntrega::resizeEvent(QResizeEvent *e)
-{
-    qDebug() << e->size();
-}
+//    ui->visorFotoPerfil->setFixedSize( 150, 200 );
+//    ui->gbInfo->setFixedWidth( 300 );
 
-void PrimeraEntrega::slot_procesar()
-{
-    cv::Mat imParaAlinear = ui->visor->getFrame();
 
-    cv::Mat imAlineada;
+//    jpegServer = new CMJPEGServer( 4444 );
+//    CWebContext tContext;
+//    QString sHead;
+//    QString sBody;
+//    QString sCustomResponse;
+//    QString sCustomResponseMIME;
+////    jpegServer->resume();
 
-    Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::LICENCIA );
+////    jpegServer->getContent( tContext, sHead, sBody, sCustomResponse, sCustomResponseMIME );
+//    // QString& sHead, QString& sBody, QString& sCustomResponse, QString& sCustomResponseMIME)
 
-    cv::Mat imConRectangulos;
 
-    QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada, imConRectangulos, Procesador::LICENCIA );
+//    connect( ui->pbEnviar, SIGNAL( pressed() ), this, SLOT( slot_enviarrFoto() ) );
+//}
 
-    ui->visor->setMat( imConRectangulos );
+//PrimeraEntrega::~PrimeraEntrega()
+//{
+//    delete ui;
+//}
 
-    ui->leDni->setText( datosExtraidos.at( 0 ) );
-    ui->leApellido->setText( datosExtraidos.at( 1 ) );
-    ui->leNombre->setText( datosExtraidos.at( 2 ) );
-    ui->leNacimiento->setText( datosExtraidos.at( 4 ) );
-    ui->leOtorgamiento->setText( datosExtraidos.at( 5 ) );
-    ui->leVencimiento->setText( datosExtraidos.at( 6 ) );
+//void PrimeraEntrega::resizeEvent(QResizeEvent *e)
+//{
+//    qDebug() << e->size();
+//}
 
-    cv::Mat imFotoPerfil;
+//void PrimeraEntrega::slot_procesar()
+//{
+//    cv::Mat imParaAlinear = ui->visor->getFrame();
 
-    Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::LICENCIA );
+//    cv::Mat imAlineada;
 
-    ui->visorFotoPerfil->setMat( imFotoPerfil );
+//    Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::LICENCIA );
 
-}
+//    cv::Mat imConRectangulos;
 
-void PrimeraEntrega::slot_elegirFoto()
-{
-    QString archivo;
-//    archivo = QFileDialog::getOpenFileName( this, "Abrir imagen", "/home/cosimani", "Images (*.png *.xpm *.jpg)");
-//    ui->visor->setImagenDisco( archivo );
+//    QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada, imConRectangulos, Procesador::LICENCIA );
 
-    std::string imFilename;
+//    ui->visor->setMat( imConRectangulos );
 
-    if ( archivo.isEmpty() )
-        imFilename = "../imagenes/LicenciaFoto5.jpg";
-    else
-        imFilename = archivo.toStdString();
+//    ui->leDni->setText( datosExtraidos.at( 0 ) );
+//    ui->leApellido->setText( datosExtraidos.at( 1 ) );
+//    ui->leNombre->setText( datosExtraidos.at( 2 ) );
+//    ui->leNacimiento->setText( datosExtraidos.at( 4 ) );
+//    ui->leOtorgamiento->setText( datosExtraidos.at( 5 ) );
+//    ui->leVencimiento->setText( datosExtraidos.at( 6 ) );
 
-    cv::Mat imParaProcesar = cv::imread( imFilename );
+//    cv::Mat imFotoPerfil;
 
-    cv::imwrite( "../imagenes/registros/imParaProcesar.jpg", imParaProcesar );
+//    Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::LICENCIA );
 
-    ui->visor->setMat( imParaProcesar );
+//    ui->visorFotoPerfil->setMat( imFotoPerfil );
 
-}
+//}
+
+//void PrimeraEntrega::slot_elegirFoto()
+//{
+//    QString archivo;
+////    archivo = QFileDialog::getOpenFileName( this, "Abrir imagen", "/home/cosimani", "Images (*.png *.xpm *.jpg)");
+////    ui->visor->setImagenDisco( archivo );
+
+//    std::string imFilename;
+
+//    if ( archivo.isEmpty() )
+//        imFilename = "../../imagenes/LicenciaFoto5.jpg";
+//    else
+//        imFilename = archivo.toStdString();
+
+//    cv::Mat imParaProcesar = cv::imread( imFilename );
+
+//    cv::imwrite( "../../imagenes/registros/imParaProcesar.jpg", imParaProcesar );
+
+//    ui->visor->setMat( imParaProcesar );
+
+//}
+
+//void PrimeraEntrega::slot_enviarrFoto()
+//{
+//    jpegServer->sendImage( QImage( "../../imagenes/LicenciaFoto5.jpg" ) );
+//}
+
+//void PrimeraEntrega::slot_procesarImagen(QString, QUrlQuery, QImage im )
+//{
+
+//    cv::Mat imParaAlinear( im.height(), im.width(), CV_8UC3, ( void * )im.constBits(), im.bytesPerLine() );
+//    cv::cvtColor( imParaAlinear, imParaAlinear, COLOR_RGB2BGR );
+
+////    cv::Mat imParaAlinear = ui->visor->getFrame();
+
+//    cv::Mat imAlineada;
+
+//    Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::LICENCIA );
+
+//    cv::Mat imConRectangulos;
+
+//    QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada, imConRectangulos, Procesador::LICENCIA );
+
+//    ui->visor->setMat( imConRectangulos );
+
+//    ui->leDni->setText( datosExtraidos.at( 0 ) );
+//    ui->leApellido->setText( datosExtraidos.at( 1 ) );
+//    ui->leNombre->setText( datosExtraidos.at( 2 ) );
+//    ui->leNacimiento->setText( datosExtraidos.at( 4 ) );
+//    ui->leOtorgamiento->setText( datosExtraidos.at( 5 ) );
+//    ui->leVencimiento->setText( datosExtraidos.at( 6 ) );
+
+//    cv::Mat imFotoPerfil;
+
+//    Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::LICENCIA );
+
+//    ui->visorFotoPerfil->setMat( imFotoPerfil );
+
+//}
