@@ -47,7 +47,7 @@ public:
     void err( QString text );
 
     QString getOut() const;
-    void setOut( const QString & value );
+    void setPrefixArchivoLog( const QString & value );
 
     QFile *getFile() const;
     void setFile( QFile * value );

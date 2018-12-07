@@ -54,14 +54,16 @@ SOURCES += \
     webservice.cpp \
     config.cpp \
     logger.cpp \
-    database.cpp
+    database.cpp \
+    conexion.cpp
 
 HEADERS += \
     procesador.h \
     webservice.h \
     config.h \
     logger.h \
-    database.h
+    database.h \
+    conexion.h
 
 FORMS +=
 

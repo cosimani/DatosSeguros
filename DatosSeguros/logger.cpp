@@ -16,7 +16,6 @@ Logger * Logger::getInstance()
     if( ! instance )
     {
         instance = new Logger();
-        LOG_INF( "Logger: successfully initialized" );
     }
     return instance;
 }
@@ -26,10 +25,27 @@ QString Logger::getOut() const
     return out;
 }
 
-void Logger::setOut( const QString &value )
+void Logger::setPrefixArchivoLog( const QString &value )
 {
     out = value;
-    LOG_INF( QString( "Logger: logging to " + this->getOut() ) );
+
+    if( getFile() == NULL )  {
+        QString fecha_hora = QDateTime::currentDateTime().toString( "yyyyMMddhhmmss" );
+
+        file = new QFile( getOut() + fecha_hora + ".log");
+
+        if( ! getFile()->isOpen() )
+        {
+            getFile()->open( QIODevice::ReadWrite );
+        }
+
+        if( getFile()->isOpen() )  {
+            LOG_INF( QString( "Logger: logging to " + file->fileName() ) );
+        }
+        else  {
+            LOG_INF( QString( "Logger: No se pudo abrir el archivo " + file->fileName() ) );
+        }
+    }
 }
 
 QFile *Logger::getFile() const
@@ -49,15 +65,6 @@ void Logger::log( QString text )
         return;
     }
 
-    if( getFile() == NULL )  {
-        file = new QFile( getOut() + QDateTime::currentDateTime().toString() + ".log");
-    }
-
-    if( ! getFile()->isOpen() )
-    {
-        getFile()->open( QIODevice::ReadWrite );
-    }
-
     if( getFile()->isOpen() )
     {
         QTextStream stream( getFile() );
@@ -65,7 +72,7 @@ void Logger::log( QString text )
     }
     else
     {
-        setOut( CONSOLE );
+        setPrefixArchivoLog( CONSOLE );
         log( text );
     }
 }

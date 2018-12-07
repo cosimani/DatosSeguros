@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
                                                           "../../imagenes/referencias/DniFrente.jpg" );
 #endif
 
-    Logger::getInstance()->setOut( Config::getInstance()->getString( "log_dir" ) + "DatosSeguros_" );
+    Logger::getInstance()->setPrefixArchivoLog( Config::getInstance()->getString( "log_dir" ) + "DatosSeguros_" );
 
     WebService * webService = new WebService;
     webService->iniciar( Config::getInstance()->getString( "puerto_tcp" ).toInt() );

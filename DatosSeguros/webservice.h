@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QList>
+#include <QVector>
 #include <QByteArray>
 #include <QStringList>
 #include <QUrlQuery>
@@ -15,6 +16,8 @@
 #include <opencv2/imgcodecs.hpp>
 
 #include <QZXing.h>
+
+#include "conexion.h"
 
 class QTcpServer;
 class QTcpSocket;
@@ -33,16 +36,16 @@ public:
 private:
     QTcpServer * tcpServer;
     QList< QTcpSocket * > listTcpSockets;
+    QVector< Conexion * > vConexiones;
+
     int bytesRestantesDeLaImagenPorLeer;
-    QByteArray	m_baIncomingData;		// Raw incoming data from socket
+    QByteArray m_baIncomingData;		// Raw incoming data from socket
     QImage im;
     QZXing * decoder;
 
 private slots:
     void onNewConnection();
-    void processTextMessage( QString message );
     void slot_leerDatos();
-    void processBinaryMessage( QByteArray message );
     void socketDisconnected();
 
 signals:
