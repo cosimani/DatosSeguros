@@ -4,7 +4,7 @@ Logger* Logger::instance = NULL;
 
 QString Logger::out = CONSOLE;
 
-QFile* Logger::file = NULL;
+QFile * Logger::file = NULL;
 
 Logger::Logger(QObject *parent) :
     QObject(parent)
@@ -20,59 +20,46 @@ Logger * Logger::getInstance()
     return instance;
 }
 
-QString Logger::getOut() const
-{
-    return out;
-}
-
 void Logger::setPrefixArchivoLog( const QString &value )
 {
     out = value;
 
-    if( getFile() == NULL )  {
+    if( file == NULL )  {
         QString fecha_hora = QDateTime::currentDateTime().toString( "yyyyMMddhhmmss" );
 
-        file = new QFile( getOut() + fecha_hora + ".log");
+        file = new QFile( out + fecha_hora + ".log");
 
-        if( ! getFile()->isOpen() )
+        if( ! file->isOpen() )
         {
-            getFile()->open( QIODevice::ReadWrite );
+            file->open( QIODevice::ReadWrite );
         }
 
-        if( getFile()->isOpen() )  {
+        if( file->isOpen() )  {
             LOG_INF( QString( "Logger: logging to " + file->fileName() ) );
+            qDebug() << "Logger: logging to " + file->fileName();
         }
         else  {
             LOG_INF( QString( "Logger: No se pudo abrir el archivo " + file->fileName() ) );
+            qDebug() << "Logger: No se pudo abrir el archivo " + file->fileName();
         }
     }
-}
-
-QFile *Logger::getFile() const
-{
-    return file;
-}
-
-void Logger::setFile(QFile *value)
-{
-    file = value;
 }
 
 void Logger::log( QString text )
 {
-    if( getOut() == CONSOLE )  {
+    if( out == CONSOLE )  {
         qDebug() << text;
         return;
     }
 
-    if( getFile()->isOpen() )
+    if( file->isOpen() )
     {
-        QTextStream stream( getFile() );
+        QTextStream stream( file );
         stream << text << endl;
     }
     else
     {
-        setPrefixArchivoLog( CONSOLE );
+        this->setPrefixArchivoLog( CONSOLE );
         log( text );
     }
 }

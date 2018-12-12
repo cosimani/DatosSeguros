@@ -38,8 +38,6 @@ private:
     QList< QTcpSocket * > listTcpSockets;
     QVector< Conexion * > vConexiones;
 
-    int bytesRestantesDeLaImagenPorLeer;
-    QByteArray m_baIncomingData;		// Raw incoming data from socket
     QImage im;
     QZXing * decoder;
 

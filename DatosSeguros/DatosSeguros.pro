@@ -11,7 +11,7 @@ QT += gui sql network
 CONFIG += c++11 console
 CONFIG -= app_bundle
 
-#DEFINES += EJECUTADO_EN_SERVER
+DEFINES += EJECUTADO_EN_SERVER
 
 
 #QT       += core gui sql network
@@ -55,7 +55,8 @@ SOURCES += \
     config.cpp \
     logger.cpp \
     database.cpp \
-    conexion.cpp
+    conexion.cpp \
+    validador.cpp
 
 HEADERS += \
     procesador.h \
@@ -63,11 +64,8 @@ HEADERS += \
     config.h \
     logger.h \
     database.h \
-    conexion.h
+    conexion.h \
+    validador.h
 
-FORMS +=
-
-DISTFILES += \
-    ../config/DatosSeguros.ini
 
 

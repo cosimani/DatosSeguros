@@ -6,10 +6,10 @@
 #include <QThread>
 
 #include "procesador.h"
+#include "validador.h"
 
 WebService::WebService( QObject * parent ) : QObject( parent ),
                                              tcpServer( new QTcpServer( this ) ),
-                                             bytesRestantesDeLaImagenPorLeer( 0 ),
                                              decoder( new QZXing )
 {
 
@@ -82,10 +82,11 @@ void WebService::onNewConnection()  {
 void WebService::slot_leerDatos()  {
     QTcpSocket * tcpSocket = qobject_cast< QTcpSocket * >( sender() );
 
-
-    // Averigua que tipo de carnet solicita analizar este tcpSocket
+    // Utiliza el tcpSocket que corresponde
     for( int i = 0 ; i < vConexiones.size() ; i++ )  {
+
         Conexion * conexion = vConexiones.at( i );
+
         if ( conexion->getTcpSocket() == tcpSocket )  {
 
             QByteArray ba = tcpSocket->readAll();
@@ -96,6 +97,26 @@ void WebService::slot_leerDatos()  {
                 return;
             }
 
+            ///////////////////////////////
+            /// Un par de validaciones
+            ///////////////////////////////
+
+            if ( tokens.at( 0 ) == "GET" || tokens.at( 0 ) == "HEAD" )  {
+                tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                tcpSocket->write( "\r\n" );
+                tcpSocket->write( "{ \"error\":\"El server atiende sólo solucitudes POST al recibir.php.\" }" );
+                tcpSocket->flush();
+                tcpSocket->close();
+            }
+
+            ///////////////////////////////
+            /// FIN - Un par de validaciones
+            ///////////////////////////////
+
+
+
+
             ////////////////////////////////////////////////////////
             /// PASO 1
             /// Analiza si es POST, extrae Content-Length, extrae carnet, extrae usuario, completa estos datos en
@@ -103,23 +124,17 @@ void WebService::slot_leerDatos()  {
             ////////////////////////////////////////////////////////
             if ( tokens.at( 0 ) == "POST" )  {
 
-        //        qDebug() << tokens;
-
                 // Este es el index del string donde esta Content-Length
                 int indexContentLength = tokens.indexOf( "Content-Length:" );
 
                 // Este for actualiza el sizeDeLaImagen de la Conexion que corresponde a este tcpSocket
-                for( int i = 0 ; i < vConexiones.size() ; i++ )  {
-                    Conexion * conexion = vConexiones.at( i );
-                    if ( conexion->getTcpSocket() == tcpSocket )  {
-                        conexion->setSizeDeLaImagen( indexContentLength );
-                    }
-                }
+                conexion->setSizeDeLaImagen( indexContentLength );
 
                 // Si Content-Length existe, entonces el string siguiente es el numero de bytes que tiene la imagen
                 if ( tokens.size() > indexContentLength )  {
                     QString strBytesDeLaImagen = tokens.at( indexContentLength + 1 );
-                    bytesRestantesDeLaImagenPorLeer = strBytesDeLaImagen.toInt();
+                    conexion->setBytesRestantes( strBytesDeLaImagen.toInt() );
+//                    bytesRestantesDeLaImagenPorLeer = strBytesDeLaImagen.toInt();
                 }
 
                 QString token2 = tokens.at( 1 );  // token2 es algo como /recibir.php?usuario=cosimani&carnet=licencia
@@ -141,16 +156,11 @@ void WebService::slot_leerDatos()  {
                         // query contendra todas las variables para se interpretada con metodos de QUrlQuery
                         QUrlQuery query( recurso_y_variables.at( 1 ) );
 
-                        // Este for actualiza el tipo de carnet que solicita analizar este tcpSocket
-                        for( int i = 0 ; i < vConexiones.size() ; i++ )  {
-                            Conexion * conexion = vConexiones.at( i );
-                            if ( conexion->getTcpSocket() == tcpSocket )  {
-                                QString tipoCarnet = query.queryItemValue( "carnet" );
-                                QString usuario = query.queryItemValue( "usuario" );
-                                conexion->setTipo( tipoCarnet );
-                                conexion->setUsuario( usuario );
-                            }
-                        }
+                        // Se actualiza el tipo de carnet que solicita analizar este tcpSocket
+                        QString tipoCarnet = query.queryItemValue( "carnet" );
+                        QString usuario = query.queryItemValue( "usuario" );
+                        conexion->setTipo( tipoCarnet );
+                        conexion->setUsuario( usuario );
                     }
                 }
             ////////////////////////////////////////////////////////
@@ -164,9 +174,10 @@ void WebService::slot_leerDatos()  {
                 /// Se van obteniendo los datos binarios para formar la imagen
                 ////////////////////////////////////////////////////////
 
-                QByteArray baData = ba;
-                m_baIncomingData.append( baData );
-                bytesRestantesDeLaImagenPorLeer -= baData.count();
+                conexion->appendData( ba );
+
+                int bytesRestantes = conexion->getBytesRestantes() - ba.count();
+                conexion->setBytesRestantes( bytesRestantes );
 
                 ////////////////////////////////////////////////////////
                 /// FIN - PASO 2
@@ -178,22 +189,24 @@ void WebService::slot_leerDatos()  {
                 /// PASO 3
                 /// Cuando los bytes restantes es cero, entonces se procede a analizar la imagen
                 ////////////////////////////////////////////////////////
-                if ( bytesRestantesDeLaImagenPorLeer <= 0 )  {
+                if ( conexion->getBytesRestantes() <= 0 )  {
 
-                    if ( im.loadFromData( m_baIncomingData, "JPG" ) )  {
+                    if ( im.loadFromData( conexion->getImData(), "JPG" ) )  {
                         im = im.convertToFormat( QImage::Format_RGB888 );
 
                         QString fecha_hora = QDateTime::currentDateTime().toString( "yyyyMMddhhmmss" );
 
         #ifdef EJECUTADO_EN_SERVER
-                        QString nombreArchivo = "imagenes/" + fecha_hora + ".png";
+
+                        conexion->setFecha_hora_foto( fecha_hora );
+                        QString nombreArchivo = "imagenes/registros/" + conexion->getFecha_hora_foto() + ".jpg";
         #else
                         QString nombreArchivo = "../" + fecha_hora + ".jpg";
         #endif
                         // Guardamos la imagen que el usuario envio para analizar
                         im.save( nombreArchivo.toStdString().c_str() );
 
-                        m_baIncomingData.clear();
+                        conexion->clearData();
                     }
                     else  {
 
@@ -208,317 +221,569 @@ void WebService::slot_leerDatos()  {
                         return;
                     }
 
+
                     cv::Mat imParaAlinear( im.height(), im.width(),
                                            CV_8UC3, ( void * )im.constBits(), im.bytesPerLine() );
 
                     cv::cvtColor( imParaAlinear, imParaAlinear, cv::COLOR_RGB2BGR );
 
-        #ifdef EJECUTADO_EN_SERVER
-                    cv::imwrite( "imagenes/registros/paraAlinear.jpg", imParaAlinear );
+#ifdef EJECUTADO_EN_SERVER
+                    QString paraAlinear = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_paraAlinear.jpg";
+                    cv::imwrite( paraAlinear.toStdString().c_str(), imParaAlinear );
+#else
+                    cv::imwrite( "../imagenes/registros/paraAlinear.jpg", imParaAlinear );
+#endif
 
-        #else
-                    cv::imwrite( "../../imagenes/registros/paraAlinear.jpg", imParaAlinear );
-        #endif
+                    if ( conexion->getTipo() == "dni" )  {
+                        qDebug() << "dni";
 
-                    QString resultadoZXing;
-                    cv::Mat matParaLeerCodigo;
+                        QString resultadoZXing;
+                        cv::Mat matParaLeerCodigo;
 
-                    cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
+                        cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
 
-        //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+            //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
 
-        //            //Erode the image with 3x3 kernel
-        //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
-        //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
+            //            //Erode the image with 3x3 kernel
+            //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
+            //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
 
-                    cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
-                                           CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+                        cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                               CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
 
-        #ifdef EJECUTADO_EN_SERVER
-                    cv::imwrite( "imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
-        #else
-                    cv::imwrite( "../../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
-        #endif
+    #ifdef EJECUTADO_EN_SERVER
+                        QString paraLeerCodigo1 = "imagenes/registros/" +
+                                                  conexion->getFecha_hora_foto() + "_paraLeerCodigo1.jpg";
+                        cv::imwrite( paraLeerCodigo1.toStdString().c_str(), matParaLeerCodigo );
+    #else
+                        cv::imwrite( "../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
+    #endif
 
-                    cv::Mat imAlineada;
 
-                    // Averigua que tipo de carnet solicita analizar este tcpSocket
-                    for( int i = 0 ; i < vConexiones.size() ; i++ )  {
-                        Conexion * conexion = vConexiones.at( i );
-                        if ( conexion->getTcpSocket() == tcpSocket )  {
+                        cv::Mat imAlineada;
 
-                            if ( conexion->getTipo() == "dni" )  {
+                        // Busca el codigo antes de alinear
+                        resultadoZXing = decoder->decodeImage( QImage( matParaLeerCodigo.data, matParaLeerCodigo.cols,
+                                                                       matParaLeerCodigo.rows, matParaLeerCodigo.step,
+                                                                       QImage::Format_Grayscale8 ) );
 
-                                // Busca el codigo antes de alinear
-                                resultadoZXing = decoder->decodeImage( QImage( matParaLeerCodigo.data, matParaLeerCodigo.cols,
-                                                                               matParaLeerCodigo.rows, matParaLeerCodigo.step,
-                                                                               QImage::Format_Grayscale8
-                                                                             )
-                                                                     );
+                        Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::DNI );
 
-                                Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::DNI );
-                                qDebug() << "dni";
+                        if ( imAlineada.rows == 0 )  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"Parece que no hay un DNI en la imagen.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
 
-                                if ( imAlineada.rows == 0 )  {
-                                    tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
-                                    tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
-                                    tcpSocket->write( "\r\n" );
-                                    tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos 1.\" }" );
-                                    tcpSocket->flush();
-                                    tcpSocket->close();
-
-                                    return;
-                                }
-
-                                if ( resultadoZXing.isEmpty() )  {
-                                    cv::cvtColor( imAlineada, matParaLeerCodigo, CV_RGB2GRAY );
-                    //                cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
-
-                                    cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
-                                                           CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
-
-        #ifdef EJECUTADO_EN_SERVER
-                                    cv::imwrite( "imagenes/registros/matParaLeerCodigo2.jpg", matParaLeerCodigo );
-        #else
-                                    cv::imwrite( "../../imagenes/registros/matParaLeerCodigo2.jpg", matParaLeerCodigo );
-        #endif
-                                    resultadoZXing = decoder->decodeImage( QImage( matParaLeerCodigo.data, matParaLeerCodigo.cols,
-                                                                                   matParaLeerCodigo.rows, matParaLeerCodigo.step,
-                                                                                   QImage::Format_Grayscale8
-                                                                                 )
-                                                                         );
-
-                                }
-
-
-
-        #ifdef EJECUTADO_EN_SERVER
-                                cv::imwrite( "imagenes/registros/alineada.jpg", imAlineada );
-
-        #else
-                                cv::imwrite( "../../imagenes/registros/alineada.jpg", imAlineada );
-        #endif
-
-
-                                cv::Mat imConRectangulos;
-
-                                QStringList datosExtraidos;
-
-                                datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
-                                                                                          imConRectangulos,
-                                                                                          Procesador::DNI );
-
-        #ifdef EJECUTADO_EN_SERVER
-                                cv::imwrite( "imagenes/registros/conRectangulos.jpg", imConRectangulos );
-
-        #else
-                                cv::imwrite( "../../imagenes/registros/conRectangulos.jpg", imConRectangulos );
-        #endif
-
-
-                                cv::Mat imFotoPerfil;
-
-                                Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::DNI );
-
-        #ifdef EJECUTADO_EN_SERVER
-                                cv::imwrite( "imagenes/registros/fotoPerfil.jpg", imFotoPerfil );
-        #else
-                                cv::imwrite( "../../imagenes/registros/fotoPerfil.jpg", imFotoPerfil );
-        #endif
-
-
-                                QString json;
-
-                                bool noSonBuenosLosDatosExtraidos = false;
-
-                                if ( resultadoZXing.isEmpty() )  {
-
-                                    QString dni = datosExtraidos.at( 0 );
-                                    dni.remove( QRegExp( "[^a-zA-Z\\d\\s]" ) );  // Elimina signos
-                                    dni.replace( "O", "0", Qt::CaseInsensitive );
-                                    dni.replace( "I", "1", Qt::CaseInsensitive );  dni.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                    QString apellido = datosExtraidos.at( 1 );
-                                    apellido.replace( "0", "O" );  apellido.replace( "1", "I" );
-                                    apellido.replace( "|", "I" );  apellido.replace( "2", "Z" );
-
-                                    QString nombre = datosExtraidos.at( 2 );
-                                    nombre.replace( "0", "O" );  nombre.replace( "1", "I" );
-                                    nombre.replace( "|", "I" );  nombre.replace( "2", "Z" );
-
-                                    QString nacimiento = datosExtraidos.at( 4 );
-                                    nacimiento.replace( "O", "0", Qt::CaseInsensitive );
-                                    nacimiento.replace( "I", "1", Qt::CaseInsensitive );
-                                    nacimiento.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                    QString otorgamiento = datosExtraidos.at( 5 );
-                                    otorgamiento.replace( "O", "0", Qt::CaseInsensitive );
-                                    otorgamiento.replace( "I", "1", Qt::CaseInsensitive );
-                                    otorgamiento.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                    QString vencimiento = datosExtraidos.at( 6 );
-                                    vencimiento.replace( "O", "0", Qt::CaseInsensitive );
-                                    vencimiento.replace( "I", "1", Qt::CaseInsensitive );
-                                    vencimiento.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                    if ( dni.size() != 8 || apellido.size() < 2 || nombre.size() < 2 ||
-                                         nacimiento.size() < 4 || otorgamiento.size() < 4 || vencimiento.size() < 4 )
-                                        noSonBuenosLosDatosExtraidos = true;
-
-                                    json.append( "{ \"dni\":\"" + dni );
-                                    json.append( "\", \"apellido\":\"" + apellido );
-                                    json.append( "\", \"nombre\":\"" + nombre );
-                                    json.append( "\", \"nacimiento\":\"" + nacimiento );
-                                    json.append( "\", \"otorgamiento\":\"" + otorgamiento );
-                                    json.append( "\", \"vencimiento\":\"" + vencimiento + "\" }" );
-                                }
-                                else  {
-                                    // 00371082464 @ OSIMANI @ CESAR ALEJANDRO @ M @ 26413920 @ A @ 02/02/1978 @ 21/05/2015 @ 202
-                                    //     0            1            2           3       4      5       6            7         8
-                                    QStringList datosCodigoPDF147 = resultadoZXing.split( "@" );
-
-                                    json.append( "{ \"dni\":\"" + datosCodigoPDF147.at( 4 ) );
-                                    json.append( "\", \"apellido\":\"" + datosCodigoPDF147.at( 1 ) );
-                                    json.append( "\", \"nombre\":\"" + datosCodigoPDF147.at( 2 ) );
-                                    json.append( "\", \"nacimiento\":\"" + datosCodigoPDF147.at( 6 ) );
-                                    json.append( "\", \"otorgamiento\":\"" + datosCodigoPDF147.at( 7 ) );
-
-                                    QDate dateVencimiento = QDate::fromString( datosCodigoPDF147.at( 7 ), "dd/MM/yyyy" ).addYears( 15 );
-
-                                    json.append( "\", \"vencimiento\":\"" + dateVencimiento.toString( "dd/MM/yyyy" ) + "\" }" );
-                    //                json.append( "\", \"vencimiento\":\"" + datosCodigoPDF147.at( 8 ) + "\" }" );
-
-                                    if ( datosCodigoPDF147.at( 4 ).size() < 8 )
-                                        noSonBuenosLosDatosExtraidos = true;
-                                }
-
-                                qDebug() << json;
-
-                                if ( noSonBuenosLosDatosExtraidos )  {
-                                    tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
-                                    tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
-                                    tcpSocket->write( "\r\n" );
-                                    tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos.\" }" );
-                                    tcpSocket->flush();
-                                    tcpSocket->close();
-
-                                }
-                                else  {
-                                    tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
-                                    tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
-                                    tcpSocket->write( "\r\n" );
-                                    tcpSocket->write( json.toStdString().c_str() );
-                                    tcpSocket->flush();
-                                    tcpSocket->close();
-                                }
-
-
-
-
-                            }
-                            else if ( conexion->getTipo() == "licencia" )  {
-                                Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::LICENCIA );
-                                qDebug() << "licencia";
-
-                                if ( imAlineada.rows == 0 )  {
-                                    tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
-                                    tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
-                                    tcpSocket->write( "\r\n" );
-                                    tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos 1.\" }" );
-                                    tcpSocket->flush();
-                                    tcpSocket->close();
-
-                                    return;
-                                }
-
-
-
-
-        #ifdef EJECUTADO_EN_SERVER
-                                cv::imwrite( "imagenes/registros/alineada.jpg", imAlineada );
-
-        #else
-                                cv::imwrite( "../../imagenes/registros/alineada.jpg", imAlineada );
-        #endif
-
-
-                                cv::Mat imConRectangulos;
-
-                                QStringList datosExtraidos;
-
-                                datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
-                                                                                          imConRectangulos,
-                                                                                          Procesador::LICENCIA );
-
-        #ifdef EJECUTADO_EN_SERVER
-                                cv::imwrite( "imagenes/registros/conRectangulos.jpg", imConRectangulos );
-
-        #else
-                                cv::imwrite( "../../imagenes/registros/conRectangulos.jpg", imConRectangulos );
-        #endif
-
-
-                                cv::Mat imFotoPerfil;
-
-                                Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::LICENCIA );
-
-        #ifdef EJECUTADO_EN_SERVER
-                                cv::imwrite( "imagenes/registros/fotoPerfil.jpg", imFotoPerfil );
-        #else
-                                cv::imwrite( "../../imagenes/registros/fotoPerfil.jpg", imFotoPerfil );
-        #endif
-
-                                QString json;
-
-                                QString dni = datosExtraidos.at( 0 );
-                                dni.remove( QRegExp( "[^a-zA-Z\\d\\s]" ) );  // Elimina signos
-                                dni.replace( "O", "0", Qt::CaseInsensitive );
-                                dni.replace( "I", "1", Qt::CaseInsensitive );  dni.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                QString apellido = datosExtraidos.at( 1 );
-                                apellido.replace( "0", "O" );  apellido.replace( "1", "I" );
-                                apellido.replace( "|", "I" );  apellido.replace( "2", "Z" );
-
-                                QString nombre = datosExtraidos.at( 2 );
-                                nombre.replace( "0", "O" );  nombre.replace( "1", "I" );
-                                nombre.replace( "|", "I" );  nombre.replace( "2", "Z" );
-
-                                QString nacimiento = datosExtraidos.at( 4 );
-                                nacimiento.replace( "O", "0", Qt::CaseInsensitive );
-                                nacimiento.replace( "I", "1", Qt::CaseInsensitive );
-                                nacimiento.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                QString otorgamiento = datosExtraidos.at( 5 );
-                                otorgamiento.replace( "O", "0", Qt::CaseInsensitive );
-                                otorgamiento.replace( "I", "1", Qt::CaseInsensitive );
-                                otorgamiento.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                QString vencimiento = datosExtraidos.at( 6 );
-                                vencimiento.replace( "O", "0", Qt::CaseInsensitive );
-                                vencimiento.replace( "I", "1", Qt::CaseInsensitive );
-                                vencimiento.replace( "Z", "2", Qt::CaseInsensitive );
-
-                                json.append( "{ \"dni\":\"" + dni );
-                                json.append( "\", \"apellido\":\"" + apellido );
-                                json.append( "\", \"nombre\":\"" + nombre );
-                                json.append( "\", \"nacimiento\":\"" + nacimiento );
-                                json.append( "\", \"otorgamiento\":\"" + otorgamiento );
-                                json.append( "\", \"vencimiento\":\"" + vencimiento + "\" }" );
-
-                                qDebug() << json;
-
-                                tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
-                                tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
-                                tcpSocket->write( "\r\n" );
-                                tcpSocket->write( json.toStdString().c_str() );
-                                tcpSocket->flush();
-                                tcpSocket->close();
-                            }
-                            else  {
-                                qDebug() << "ninguno";
-                            }
-
+                            return;
                         }
+
+                        if ( resultadoZXing.isEmpty() )  {
+                            cv::cvtColor( imAlineada, matParaLeerCodigo, CV_RGB2GRAY );
+            //                cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+
+                            cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                                   CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+
+#ifdef EJECUTADO_EN_SERVER
+                            QString paraLeerCodigo2 = "imagenes/registros/" +
+                                                      conexion->getFecha_hora_foto() + "_paraLeerCodigo2.jpg";
+                            cv::imwrite( paraLeerCodigo2.toStdString().c_str(), matParaLeerCodigo );
+#else
+                            cv::imwrite( "../imagenes/registros/matParaLeerCodigo2.jpg", matParaLeerCodigo );
+#endif
+                            resultadoZXing = decoder->decodeImage( QImage( matParaLeerCodigo.data,
+                                                                           matParaLeerCodigo.cols,
+                                                                           matParaLeerCodigo.rows,
+                                                                           matParaLeerCodigo.step,
+                                                                           QImage::Format_Grayscale8 ) );
+                        }
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString alineada = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_alineada.jpg";
+                        cv::imwrite( alineada.toStdString().c_str(), imAlineada );
+#else
+                        cv::imwrite( "../imagenes/registros/alineada.jpg", imAlineada );
+#endif
+
+                        cv::Mat imConRectangulos;
+
+                        QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
+                                                                                              imConRectangulos,
+                                                                                              Procesador::DNI );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString conRectangulos = "imagenes/registros/" +
+                                                 conexion->getFecha_hora_foto() + "_conRectangulos.jpg";
+                        cv::imwrite( conRectangulos.toStdString().c_str(), imConRectangulos );
+
+#else
+                        cv::imwrite( "../imagenes/registros/conRectangulos.jpg", imConRectangulos );
+#endif
+
+                        cv::Mat imFotoPerfil;
+
+                        Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::DNI );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString fotoPerfil = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_fotoPerfil.jpg";
+                        cv::imwrite( fotoPerfil.toStdString().c_str(), imFotoPerfil );
+#else
+                        cv::imwrite( "../imagenes/registros/fotoPerfil.jpg", imFotoPerfil );
+#endif
+
+                        QString json;
+
+                        // Este if es para cuando no se pudo con el codigo, entocnes devuelve los datos de la imagen
+                        if ( resultadoZXing.isEmpty() )  {
+                            json = Validador::getInstance()->validarDniDeImagen( datosExtraidos );
+                        }
+                        else  {
+                            json = Validador::getInstance()->validaDniDeCodigo( resultadoZXing.split( "@" ) );
+                        }
+
+                        qDebug() << json;
+
+                        if ( json.isEmpty() )  {  // Si el json esta vacio es porque no fueron validos los datos
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                        else  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( json.toStdString().c_str() );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                    }
+                    else if ( conexion->getTipo() == "dni-dorso" )  {
+                        qDebug() << "dni-dorso";
+
+                        cv::Mat matParaLeerCodigo;
+
+                        cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
+
+            //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+
+            //            //Erode the image with 3x3 kernel
+            //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
+            //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
+
+                        cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                               CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+
+    #ifdef EJECUTADO_EN_SERVER
+                        QString paraLeerCodigo1 = "imagenes/registros/" +
+                                                  conexion->getFecha_hora_foto() + "_paraLeerCodigo1.jpg";
+                        cv::imwrite( paraLeerCodigo1.toStdString().c_str(), matParaLeerCodigo );
+    #else
+                        cv::imwrite( "../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
+    #endif
+
+
+                        cv::Mat imAlineada;
+
+                        Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::DNI_DORSO );
+
+                        if ( imAlineada.rows == 0 )  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"Parece que no hay un DNI de dorso en la imagen.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+
+                            return;
+                        }
+
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString alineada = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_alineada.jpg";
+                        cv::imwrite( alineada.toStdString().c_str(), imAlineada );
+#else
+                        cv::imwrite( "../imagenes/registros/alineada.jpg", imAlineada );
+#endif
+
+                        cv::Mat imConRectangulos;
+
+                        QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
+                                                                                              imConRectangulos,
+                                                                                              Procesador::DNI_DORSO );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString conRectangulos = "imagenes/registros/" +
+                                                 conexion->getFecha_hora_foto() + "_conRectangulos.jpg";
+                        cv::imwrite( conRectangulos.toStdString().c_str(), imConRectangulos );
+
+#else
+                        cv::imwrite( "../imagenes/registros/conRectangulos.jpg", imConRectangulos );
+#endif
+                        QString json = Validador::getInstance()->validaDniDorso( datosExtraidos );
+
+                        qDebug() << json;
+
+                        if ( json.isEmpty() )  {  // Si el json esta vacio es porque no fueron validos los datos
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                        else  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( json.toStdString().c_str() );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                    }
+                    else if ( conexion->getTipo() == "licencia" )  {
+                        qDebug() << "licencia";
+
+                        cv::Mat matParaLeerCodigo;
+
+                        cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
+
+            //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+
+            //            //Erode the image with 3x3 kernel
+            //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
+            //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
+
+                        cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                               CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+
+    #ifdef EJECUTADO_EN_SERVER
+                        QString paraLeerCodigo1 = "imagenes/registros/" +
+                                                  conexion->getFecha_hora_foto() + "_paraLeerCodigo1.jpg";
+                        cv::imwrite( paraLeerCodigo1.toStdString().c_str(), matParaLeerCodigo );
+    #else
+                        cv::imwrite( "../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
+    #endif
+
+
+                        cv::Mat imAlineada;
+
+                        Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::LICENCIA );
+
+                        if ( imAlineada.rows == 0 )  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"Parece que no hay una licencia de Cba en la imagen.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+
+                            return;
+                        }
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString alineada = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_alineada.jpg";
+                        cv::imwrite( alineada.toStdString().c_str(), imAlineada );
+
+#else
+                        cv::imwrite( "../imagenes/registros/alineada.jpg", imAlineada );
+#endif
+
+
+                        cv::Mat imConRectangulos;
+
+                        QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
+                                                                                              imConRectangulos,
+                                                                                              Procesador::LICENCIA );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString conRectangulos = "imagenes/registros/" +
+                                                 conexion->getFecha_hora_foto() + "_conRectangulos.jpg";
+                        cv::imwrite( conRectangulos.toStdString().c_str(), imConRectangulos );
+
+#else
+                        cv::imwrite( "../imagenes/registros/conRectangulos.jpg", imConRectangulos );
+#endif
+
+
+                        cv::Mat imFotoPerfil;
+
+                        Procesador::getInstancia()->extraerFoto( imAlineada, imFotoPerfil, Procesador::LICENCIA );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString fotoPerfil = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_fotoPerfil.jpg";
+                        cv::imwrite( fotoPerfil.toStdString().c_str(), imFotoPerfil );
+#else
+                        cv::imwrite( "../imagenes/registros/fotoPerfil.jpg", imFotoPerfil );
+#endif
+
+                        QString json = Validador::getInstance()->validarLicenciaDeImagen( datosExtraidos );
+
+                        qDebug() << json;
+
+                        tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                        tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                        tcpSocket->write( "\r\n" );
+                        tcpSocket->write( json.toStdString().c_str() );
+                        tcpSocket->flush();
+                        tcpSocket->close();
+                    }
+                    else if ( conexion->getTipo() == "licencia-dorso" )  {
+                        qDebug() << "licencia-dorso";
+
+                        cv::Mat matParaLeerCodigo;
+
+                        cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
+
+            //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+
+            //            //Erode the image with 3x3 kernel
+            //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
+            //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
+
+                        cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                               CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+
+    #ifdef EJECUTADO_EN_SERVER
+                        QString paraLeerCodigo1 = "imagenes/registros/" +
+                                                  conexion->getFecha_hora_foto() + "_paraLeerCodigo1.jpg";
+                        cv::imwrite( paraLeerCodigo1.toStdString().c_str(), matParaLeerCodigo );
+    #else
+                        cv::imwrite( "../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
+    #endif
+
+
+                        cv::Mat imAlineada;
+
+                        Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::LICENCIA_DORSO );
+
+                        if ( imAlineada.rows == 0 )  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"Parece que no hay una licencia de dorso en la imagen.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+
+                            return;
+                        }
+
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString alineada = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_alineada.jpg";
+                        cv::imwrite( alineada.toStdString().c_str(), imAlineada );
+#else
+                        cv::imwrite( "../imagenes/registros/alineada.jpg", imAlineada );
+#endif
+
+                        cv::Mat imConRectangulos;
+
+                        QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
+                                                                                              imConRectangulos,
+                                                                                              Procesador::LICENCIA_DORSO );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString conRectangulos = "imagenes/registros/" +
+                                                 conexion->getFecha_hora_foto() + "_conRectangulos.jpg";
+                        cv::imwrite( conRectangulos.toStdString().c_str(), imConRectangulos );
+
+#else
+                        cv::imwrite( "../imagenes/registros/conRectangulos.jpg", imConRectangulos );
+#endif
+                        QString json = Validador::getInstance()->validaLicenciaDorso( datosExtraidos );
+
+                        qDebug() << json;
+
+                        if ( json.isEmpty() )  {  // Si el json esta vacio es porque no fueron validos los datos
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                        else  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( json.toStdString().c_str() );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                    }
+                    else if ( conexion->getTipo() == "verde" )  {
+                        qDebug() << "verde";
+
+                        cv::Mat matParaLeerCodigo;
+
+                        cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
+
+            //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+
+            //            //Erode the image with 3x3 kernel
+            //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
+            //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
+
+                        cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                               CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+
+    #ifdef EJECUTADO_EN_SERVER
+                        QString paraLeerCodigo1 = "imagenes/registros/" +
+                                                  conexion->getFecha_hora_foto() + "_paraLeerCodigo1.jpg";
+                        cv::imwrite( paraLeerCodigo1.toStdString().c_str(), matParaLeerCodigo );
+    #else
+                        cv::imwrite( "../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
+    #endif
+
+
+                        cv::Mat imAlineada;
+
+                        Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::VERDE );
+
+                        if ( imAlineada.rows == 0 )  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"Parece que no hay una tarjeta verde de frente en la imagen.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+
+                            return;
+                        }
+
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString alineada = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_alineada.jpg";
+                        cv::imwrite( alineada.toStdString().c_str(), imAlineada );
+#else
+                        cv::imwrite( "../imagenes/registros/alineada.jpg", imAlineada );
+#endif
+
+                        cv::Mat imConRectangulos;
+
+                        QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
+                                                                                              imConRectangulos,
+                                                                                              Procesador::VERDE );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString conRectangulos = "imagenes/registros/" +
+                                                 conexion->getFecha_hora_foto() + "_conRectangulos.jpg";
+                        cv::imwrite( conRectangulos.toStdString().c_str(), imConRectangulos );
+
+#else
+                        cv::imwrite( "../imagenes/registros/conRectangulos.jpg", imConRectangulos );
+#endif
+                        QString json = Validador::getInstance()->validaVerde( datosExtraidos );
+
+                        qDebug() << json;
+
+                        if ( json.isEmpty() )  {  // Si el json esta vacio es porque no fueron validos los datos
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                        else  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( json.toStdString().c_str() );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                    }
+                    else if ( conexion->getTipo() == "verde-dorso" )  {
+                        qDebug() << "verde-dorso";
+
+                        cv::Mat matParaLeerCodigo;
+
+                        cv::cvtColor( imParaAlinear, matParaLeerCodigo, CV_RGB2GRAY );
+
+            //            cv::threshold( matParaLeerCodigo, matParaLeerCodigo, umbral, 255, cv::THRESH_BINARY );
+
+            //            //Erode the image with 3x3 kernel
+            //            cv::erode( matParaLeerCodigo, matParaLeerCodigo,
+            //                       cv::getStructuringElement( cv::MORPH_RECT, cv::Size( 3, 3 ) ) );
+
+                        cv::adaptiveThreshold( matParaLeerCodigo, matParaLeerCodigo, 255,
+                                               CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 91, 15 );
+
+    #ifdef EJECUTADO_EN_SERVER
+                        QString paraLeerCodigo1 = "imagenes/registros/" +
+                                                  conexion->getFecha_hora_foto() + "_paraLeerCodigo1.jpg";
+                        cv::imwrite( paraLeerCodigo1.toStdString().c_str(), matParaLeerCodigo );
+    #else
+                        cv::imwrite( "../imagenes/registros/matParaLeerCodigo1.jpg", matParaLeerCodigo );
+    #endif
+
+
+                        cv::Mat imAlineada;
+
+                        Procesador::getInstancia()->alinear( imParaAlinear, imAlineada, Procesador::VERDE_DORSO );
+
+                        if ( imAlineada.rows == 0 )  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"Parece que no hay una tarjeta verde de dorso en la imagen.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+
+                            return;
+                        }
+
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString alineada = "imagenes/registros/" + conexion->getFecha_hora_foto() + "_alineada.jpg";
+                        cv::imwrite( alineada.toStdString().c_str(), imAlineada );
+#else
+                        cv::imwrite( "../imagenes/registros/alineada.jpg", imAlineada );
+#endif
+
+                        cv::Mat imConRectangulos;
+
+                        QStringList datosExtraidos = Procesador::getInstancia()->extraerInfo( imAlineada,
+                                                                                              imConRectangulos,
+                                                                                              Procesador::VERDE_DORSO );
+
+#ifdef EJECUTADO_EN_SERVER
+                        QString conRectangulos = "imagenes/registros/" +
+                                                 conexion->getFecha_hora_foto() + "_conRectangulos.jpg";
+                        cv::imwrite( conRectangulos.toStdString().c_str(), imConRectangulos );
+
+#else
+                        cv::imwrite( "../imagenes/registros/conRectangulos.jpg", imConRectangulos );
+#endif
+                        QString json = Validador::getInstance()->validaVerdeDorso( datosExtraidos );
+
+                        qDebug() << json;
+
+                        if ( json.isEmpty() )  {  // Si el json esta vacio es porque no fueron validos los datos
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( "{ \"error\":\"No se pudieron extraer correctamente los datos.\" }" );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                        else  {
+                            tcpSocket->write( "HTTP/1.0 200 OK\r\n" );
+                            tcpSocket->write( "Content-Type: text/html; charset=\"utf-8\"\r\n" );
+                            tcpSocket->write( "\r\n" );
+                            tcpSocket->write( json.toStdString().c_str() );
+                            tcpSocket->flush();
+                            tcpSocket->close();
+                        }
+                    }
+                    else  {
+                        qDebug() << "ninguno";
                     }
 
 
@@ -551,6 +816,10 @@ void WebService::socketDisconnected()
     if ( tcpSocket ) {
 //        listTcpSockets.removeAll( tcpSocket );
         listTcpSockets.removeOne( tcpSocket );
+
+        disconnect( tcpSocket, SIGNAL( readyRead() ), this, SLOT( slot_leerDatos() ) );
+        disconnect( tcpSocket, SIGNAL( disconnected() ), this, SLOT( socketDisconnected() ) );
+
         tcpSocket->deleteLater();
     }
 }

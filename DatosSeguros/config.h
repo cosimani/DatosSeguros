@@ -32,12 +32,16 @@ private:
     explicit Config(QObject *parent=NULL);
     void init();
 
+    bool ok;
+
 public:
 
     static Config *getInstance();
 
     QString getString( QString key );
     void setString( QString key, QString value );
+
+    bool isOk();
 
     string getStdString(QString key);
     const char *getCharString(QString key);

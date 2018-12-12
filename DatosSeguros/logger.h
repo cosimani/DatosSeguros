@@ -46,11 +46,7 @@ public:
     void war( QString text );
     void err( QString text );
 
-    QString getOut() const;
     void setPrefixArchivoLog( const QString & value );
-
-    QFile *getFile() const;
-    void setFile( QFile * value );
 
     ~Logger();
 };

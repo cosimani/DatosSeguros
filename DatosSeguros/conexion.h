@@ -27,13 +27,28 @@ public:
     QString getUsuario() const;
     void setUsuario(const QString &value);
 
+    int getBytesRestantes() const;
+    void setBytesRestantes(int value);
+
+    QByteArray getImData() const;
+    void appendData(QByteArray value);
+
+    void clearData();
+
+    QString getFecha_hora_foto() const;
+    void setFecha_hora_foto(const QString &value);
+
 private:
     QTcpSocket * tcpSocket;
     QString tipo;  // Puede ser dni, licencia, verde (por defecto, ninguno)
     int sizeDeLaImagen;
     QString usuario;
-    QByteArray m_baIncomingData;		// Raw incoming data from socket
-    int bytesRestantesDeLaImagenPorLeer;
+    QByteArray * imData;  // Raw incoming data from socket
+
+    // Aca se almacenan los bytes que faltan leer para completar todos los bytes de la imagen que envia el cliente
+    int bytesRestantes;
+
+    QString fecha_hora_foto;
 
 signals:
 

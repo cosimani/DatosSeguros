@@ -4,7 +4,7 @@
 Config* Config::instance = NULL;
 QVector< QStringList > * Config::strings = new QVector< QStringList >();
 
-Config::Config( QObject * parent ) : QObject( parent )  {
+Config::Config( QObject * parent ) : QObject( parent ), ok( false )  {
     init();
 }
 
@@ -43,8 +43,14 @@ void Config::init()  {
     QFile inputFile( inputFilePath );
     if( inputFile.open( QIODevice::ReadOnly ) == false )
     {
-        LOG_ERR( "Config: file not exists" );
+//        LOG_ERR( "Config: file not exists: " + inputFilePath );
+        qDebug() << "Config: file not exists: " + inputFilePath ;
+        return;
     }
+    else  {
+        this->ok = true;
+    }
+
     QTextStream in( &inputFile );
     while ( ! in.atEnd() )   {
         QString line = in.readLine();
@@ -87,7 +93,7 @@ QString Config::getString( QString key )  {
         }
     }
 
-    LOG_ERR("Config: string not found");
+    LOG_ERR( "Config: string not found: " + key );
     return "";
 }
 
@@ -170,6 +176,11 @@ void Config::setString( QString key, QString value )  {
     // Esto es para que cargue de nuevo los valores leidos desde el archivo, ya que fue modificado en este metodo.
     this->init();
 
+}
+
+bool Config::isOk()
+{
+    return this->ok;
 }
 
 

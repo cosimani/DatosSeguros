@@ -27,7 +27,7 @@ class Procesador : public QObject
 
 
 public:
-    enum TipoCarnet { NONE, DNI, LICENCIA, VERDE };
+    enum TipoCarnet { NONE, DNI, LICENCIA, VERDE, DNI_DORSO, LICENCIA_DORSO, VERDE_DORSO };
     static Procesador * getInstancia();
     ~Procesador();
 
@@ -61,6 +61,9 @@ private:
     cv::Mat imReferenciaDNI;
     cv::Mat imReferenciaLicencia;
     cv::Mat imReferenciaVerde;
+    cv::Mat imReferenciaDNI_dorso;
+    cv::Mat imReferenciaLicencia_dorso;
+    cv::Mat imReferenciaVerde_dorso;
 
     tesseract::TessBaseAPI * ocr;
 

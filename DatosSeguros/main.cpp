@@ -4,6 +4,9 @@
 #include "config.h"
 #include "logger.h"
 #include "webservice.h"
+#include "validador.h"
+
+#include <QDir>
 
 int main(int argc, char *argv[])
 {
@@ -16,25 +19,56 @@ int main(int argc, char *argv[])
 
 #ifdef EJECUTADO_EN_SERVER
 
+    Procesador::getInstancia()->configurarImageAlignment( Procesador::DNI,
+                                                          "imagenes/referencias/DniFrente.jpg" );
+
     Procesador::getInstancia()->configurarImageAlignment( Procesador::LICENCIA,
                                                           "imagenes/referencias/LicenciaFrente.jpg" );
 
-    Procesador::getInstancia()->configurarImageAlignment( Procesador::DNI,
-                                                          "imagenes/referencias/DniFrente.jpg" );
+    Procesador::getInstancia()->configurarImageAlignment( Procesador::VERDE,
+                                                          "imagenes/referencias/VerdeFrente.jpg" );
+
+    Procesador::getInstancia()->configurarImageAlignment( Procesador::DNI_DORSO,
+                                                          "imagenes/referencias/DniDorso.jpg" );
+
+    Procesador::getInstancia()->configurarImageAlignment( Procesador::LICENCIA_DORSO,
+                                                          "imagenes/referencias/LicenciaDorso.jpg" );
+
+    Procesador::getInstancia()->configurarImageAlignment( Procesador::VERDE_DORSO,
+                                                          "imagenes/referencias/VerdeDorso.jpg" );
+
+
 
 #else
 
     Procesador::getInstancia()->configurarImageAlignment( Procesador::LICENCIA,
-                                                          "../../imagenes/referencias/LicenciaFrente.jpg" );
+                                                          "../imagenes/referencias/LicenciaFrente.jpg" );
 
     Procesador::getInstancia()->configurarImageAlignment( Procesador::DNI,
-                                                          "../../imagenes/referencias/DniFrente.jpg" );
+                                                          "../imagenes/referencias/DniFrente.jpg" );
+
+//    QFile file( "../imagenes/referencias/DniFrente.jpg" );
+//    qDebug() << file.exists();
+
 #endif
 
-    Logger::getInstance()->setPrefixArchivoLog( Config::getInstance()->getString( "log_dir" ) + "DatosSeguros_" );
+    qDebug() << endl << "Directorio de trabajo: " + QDir::currentPath();
 
-    WebService * webService = new WebService;
-    webService->iniciar( Config::getInstance()->getString( "puerto_tcp" ).toInt() );
+    if ( ! Config::getInstance()->isOk() )  {
+        qDebug() << endl << "No se encuentra el archivo de configuracion. Cerrar la app.";
+
+    }
+    else  {
+
+        // Cuando setPrefixArchivoLog no es invocado, entonces out tiene valor CONSOLE
+        Logger::getInstance()->setPrefixArchivoLog( Config::getInstance()->getString( "log_dir" ) + "DatosSeguros_" );
+
+        Validador::getInstance();
+
+        WebService * webService = new WebService;
+        webService->iniciar( Config::getInstance()->getString( "puerto_tcp" ).toInt() );
+
+    }
 
     return a.exec();
 }
