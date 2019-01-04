@@ -56,7 +56,8 @@ SOURCES += \
     logger.cpp \
     database.cpp \
     conexion.cpp \
-    validador.cpp
+    validador.cpp \
+    testeador.cpp
 
 HEADERS += \
     procesador.h \
@@ -65,7 +66,8 @@ HEADERS += \
     logger.h \
     database.h \
     conexion.h \
-    validador.h
+    validador.h \
+    testeador.h
 
 
 

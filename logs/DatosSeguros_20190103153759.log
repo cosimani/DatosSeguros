@@ -1,0 +1,6 @@
+[INF] Logger: logging to logs/DatosSeguros_20190103153759.log
+[INF] Database: successfully initialized
+[INF] Database: connected ok
+[INF] WebService escuchando en puerto 8888
+[WAR] Good matches:246. No suficientes para alinear la imagen
+[WAR] No se pudo alinear la imagen del DNI frente. Intente de nuevo!

@@ -13,6 +13,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/features2d.hpp>
 
 #include <opencv2/xfeatures2d.hpp>
 
@@ -41,13 +42,18 @@ public:
 
     void alignImages( cv::Mat & im1, cv::Mat & im2, cv::Mat & im1Reg, cv::Mat & h );
 
-    void alinear(const cv::Mat &imParaAlinear, cv::Mat &imAlineada, TipoCarnet tipoCarnet = NONE );
+    bool alinearSurfFlann( const cv::Mat &imParaAlinear, cv::Mat &imAlineada, TipoCarnet tipoCarnet = NONE );
+
+    void alinear( const cv::Mat &imParaAlinear, cv::Mat &imAlineada, TipoCarnet tipoCarnet = NONE );
 
     QStringList extraerInfo( const cv::Mat & imParaProcesar, cv::Mat & imConRectangulos, TipoCarnet tipoCarnet = NONE );
 
     void extraerFoto( const  cv::Mat &imParaProcesar, cv::Mat & imFotoPerfil, TipoCarnet tipoCarnet = NONE );
 
 //    QImage extraerFirma( cv::Mat &imParaProcesar, TipoCarnet tipoCarnet = NONE );
+
+    void alinearOtraOpcion(const cv::Mat &imParaAlinear, cv::Mat &imAlineada, TipoCarnet tipoCarnet);
+    QString extraerTexto(const cv::Mat &imParaProcesar, Procesador::TipoCarnet tipoCarnet);
 
 private:
     static Procesador * instancia;
@@ -65,7 +71,8 @@ private:
     cv::Mat imReferenciaLicencia_dorso;
     cv::Mat imReferenciaVerde_dorso;
 
-    tesseract::TessBaseAPI * ocr;
+    tesseract::TessBaseAPI * ocrLinea;
+    tesseract::TessBaseAPI * ocrParrafo;
 
 signals:
 

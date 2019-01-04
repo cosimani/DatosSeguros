@@ -2,6 +2,8 @@
 #define VALIDADOR_H
 
 #include <QObject>
+#include <string>
+#include <vector>
 
 class Validador : public QObject
 {
@@ -21,6 +23,8 @@ public:
     QString validaLicenciaDorso( QStringList datosExtraidos );
     QString validaVerdeDorso( QStringList datosExtraidos );
     QString validaVerde( QStringList datosExtraidos );
+
+    int levenshtein(const std::string &s1, const std::string &s2);
 
 signals:
 

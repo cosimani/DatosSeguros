@@ -1,4 +1,7 @@
 #include "database.h"
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 
 Database* Database::instance = NULL;
 
@@ -49,6 +52,7 @@ void Database::connect()
 
     if( database.open() == false )
     {
+        qDebug() << "No se pudo abrir la base de datos. No se puede continuar.";
         LOG_ERR( "Database: cannot open connection" );
     }
 
@@ -107,16 +111,16 @@ int Database::login( QString user, QString password )
     return -1;
 }
 
-int Database::startSession(int adminId)
+int Database::startSession( int adminId )
 {
     QSqlQuery query;
 
-    query.prepare(getSessionQuery());
-    query.bindValue(":adminId", adminId);
+    query.prepare( getSessionQuery() );
+    query.bindValue( ":adminId", adminId );
 
-    if(query.exec() == false)
+    if( query.exec() == false )
     {
-        LOG_ERR(QString("Database: " + query.lastError().text()));
+        LOG_ERR( QString( "Database: " + query.lastError().text() ) );
         return -1;
     }
 
@@ -139,35 +143,145 @@ int Database::plateDetection(int sessionId)
     return query.lastInsertId().toInt();
 }
 
-int Database::candidate(QString domain, QString matches, float confidence, int plateDetectionId)
+int Database::nuevaPersona( QString dni, QString apellido, QString nombre, QString sexo )
 {
     QSqlQuery query;
 
-    query.prepare(getCandidateQuery());
-    query.bindValue(":d", domain);
-    query.bindValue(":m", matches);
-    query.bindValue(":c", confidence);
-    query.bindValue(":pdid", plateDetectionId);
+    query.prepare( Config::getInstance()->getString( "persona_insert_query" ) );
+    query.bindValue( ":dni", dni );
+    query.bindValue( ":apellido", apellido );
+    query.bindValue( ":nombre", nombre );
+    query.bindValue( ":sexo", sexo );
 
-    if(query.exec() == false)
+    if( query.exec() == false )
     {
-        LOG_ERR(QString("Database: " + query.lastError().text()));
+        LOG_ERR( QString( "Database: " + query.lastError().text() ) );
         return -1;
     }
+
+    LOG_INF( QString( "Se almacenó en la base: " + dni + " " + apellido + " " + nombre + " " + sexo ) );
+
+    qDebug() << query.lastQuery();
 
     return query.lastInsertId().toInt();
 }
 
-int Database::log(QString text, int level)
+int Database::actualizarPersona( QString dni, QString apellido, QString nombre, QString sexo )
 {
     QSqlQuery query;
 
-    query.prepare(getLogQuery());
-    query.bindValue(":m", text);
-    query.bindValue(":l", level);
+    query.prepare( Config::getInstance()->getString( "persona_update_query" ) );
 
-    if(query.exec() == false)
+    query.bindValue( ":dni", dni );
+    query.bindValue( ":apellido", apellido );
+    query.bindValue( ":nombre", nombre );
+    query.bindValue( ":sexo", sexo );
+
+    if( query.exec() == false )
     {
+        LOG_ERR( QString( "Database: " + query.lastError().text() ) );
+        return -1;
+    }
+
+    LOG_INF( QString( "Se actualizó en la base: " + dni + " " + apellido + " " + nombre + " " + sexo ) );
+
+    qDebug() << query.lastQuery();
+
+    return query.lastInsertId().toInt();
+}
+
+QVector<QStringList> Database::todasLasPersonas()
+{
+    QVector< QStringList > v;
+
+    QSqlQuery query;
+
+    query.prepare( Config::getInstance()->getString( "persona_select_query_todos" ) );
+
+    if( query.exec() == false )
+    {
+        LOG_ERR( QString( "Database: " + query.lastError().text() ) );
+        return v;
+    }
+
+    while ( query.next() )  {
+        QSqlRecord rec = query.record();
+        QStringList campos;
+        int i = 0;
+        while ( i < rec.count() )  {
+            campos << rec.value( i ).toString();
+            i++;
+        }
+
+        v.append( campos );
+    }
+
+    return v;
+}
+
+bool Database::procesarJson( QString json )
+{
+    QJsonDocument doc( QJsonDocument::fromJson( json.toUtf8() ) );
+    QJsonObject jsonObject = doc.object();
+
+    QString dni;
+    QString apellido;
+    QString nombre;
+    QString sexo;
+    QString ejemplar;
+    QString nacionalidad;
+    QString fecha_nac;
+    QString domicilio_dni;
+    QString domicilio_licencia;
+    QString fecha_otorg_dni;
+    QString fecha_otorg_licencia;
+    QString fecha_venc_dni;
+    QString fecha_venc_licencia;
+    QString cuil;
+    QString clase_licencia;
+    QString is_donante;
+    QString sangre;
+    QString observaciones_licecnia;
+    QString restriccion_licencia;
+    QString lugar_entrega_licencia;
+
+
+    foreach( const QString & key, jsonObject.keys() )  {
+        QJsonValue value = jsonObject.value( key );
+        qDebug() << "Key = " << key << ", Value = " << value.toString();
+    }
+
+//    QSqlQuery query;
+
+//    query.prepare( Config::getInstance()->getString( "persona_update_query" ) );
+
+//    query.bindValue( ":dni", dni );
+//    query.bindValue( ":apellido", apellido );
+//    query.bindValue( ":nombre", nombre );
+//    query.bindValue( ":sexo", sexo );
+
+//    if( query.exec() == false )
+//    {
+//        LOG_ERR( QString( "Database: " + query.lastError().text() ) );
+//        return false;
+//    }
+
+//    LOG_INF( QString( "Se actualizó en la base: " + dni + " " + apellido + " " + nombre + " " + sexo ) );
+
+//    qDebug() << query.lastQuery();
+
+    return true;
+}
+
+
+int Database::log( QString text, int level )  {
+    QSqlQuery query;
+
+    query.prepare( getLogQuery() );
+    query.bindValue( ":m", text );
+    query.bindValue( ":l", level );
+
+    if( query.exec() == false )  {
         return -1;
     }
 

@@ -50,6 +50,8 @@ signals:
     void signal_solicitudRecibida( QByteArray );
     void signal_queryItems( QString, QUrlQuery );
     void signal_queryItems_and_image( QString, QUrlQuery, QImage );
+
+    void signal_cerrarAplicacion();
 };
 
 #endif //WEBSERVICE_H

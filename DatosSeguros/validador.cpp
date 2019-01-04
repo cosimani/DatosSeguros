@@ -27,11 +27,12 @@ QString Validador::validarDniDeImagen( QStringList datosExtraidos )
     dni.replace( "Z", "2", Qt::CaseInsensitive );
 
     QString apellido = datosExtraidos.at( 1 );
-    apellido.replace( "0", "O" );  apellido.replace( "1", "I" );
+    apellido.replace( "0", "O" );  apellido.replace( "1", "I" );  apellido.replace( "!", "I" );
     apellido.replace( "|", "I" );  apellido.replace( "2", "Z" );
 
+
     QString nombre = datosExtraidos.at( 2 );
-    nombre.replace( "0", "O" );  nombre.replace( "1", "I" );
+    nombre.replace( "0", "O" );  nombre.replace( "1", "I" );  nombre.replace( "!", "I" );
     nombre.replace( "|", "I" );  nombre.replace( "2", "Z" );
 
     QString nacimiento = datosExtraidos.at( 4 );
@@ -56,9 +57,11 @@ QString Validador::validarDniDeImagen( QStringList datosExtraidos )
     json.append( "{ \"dni\":\"" + dni );
     json.append( "\", \"apellido\":\"" + apellido );
     json.append( "\", \"nombre\":\"" + nombre );
-    json.append( "\", \"nacimiento\":\"" + nacimiento );
-    json.append( "\", \"otorgamiento\":\"" + otorgamiento );
-    json.append( "\", \"vencimiento\":\"" + vencimiento + "\" }" );
+    json.append( "\", \"fecha_nac_dni\":\"" + nacimiento );
+    json.append( "\", \"fecha_otorg_dni\":\"" + otorgamiento );
+    json.append( "\", \"fecha_venc_dni\":\"" + vencimiento + "\" }" );
+
+
 
     return json;
 }
@@ -75,12 +78,12 @@ QString Validador::validaDniDeCodigo( QStringList datosCodigoPDF147 )
     json.append( "{ \"dni\":\"" + datosCodigoPDF147.at( 4 ) );
     json.append( "\", \"apellido\":\"" + datosCodigoPDF147.at( 1 ) );
     json.append( "\", \"nombre\":\"" + datosCodigoPDF147.at( 2 ) );
-    json.append( "\", \"nacimiento\":\"" + datosCodigoPDF147.at( 6 ) );
-    json.append( "\", \"otorgamiento\":\"" + datosCodigoPDF147.at( 7 ) );
+    json.append( "\", \"fecha_nac_dni\":\"" + datosCodigoPDF147.at( 6 ) );
+    json.append( "\", \"fecha_otorg_dni\":\"" + datosCodigoPDF147.at( 7 ) );
 
     QDate dateVencimiento = QDate::fromString( datosCodigoPDF147.at( 7 ), "dd/MM/yyyy" ).addYears( 15 );
 
-    json.append( "\", \"vencimiento\":\"" + dateVencimiento.toString( "dd/MM/yyyy" ) + "\" }" );
+    json.append( "\", \"fecha_venc_dni\":\"" + dateVencimiento.toString( "dd/MM/yyyy" ) + "\" }" );
 //                json.append( "\", \"vencimiento\":\"" + datosCodigoPDF147.at( 8 ) + "\" }" );
 
     if ( datosCodigoPDF147.at( 4 ).size() == 8 )
@@ -106,6 +109,8 @@ QString Validador::validarLicenciaDeImagen( QStringList datosExtraidos )
     nombre.replace( "0", "O" );  nombre.replace( "1", "I" );
     nombre.replace( "|", "I" );  nombre.replace( "2", "Z" );
 
+    QString domicilio = datosExtraidos.at( 3 );
+
     QString nacimiento = datosExtraidos.at( 4 );
     nacimiento.replace( "O", "0", Qt::CaseInsensitive );
     nacimiento.replace( "I", "1", Qt::CaseInsensitive );
@@ -121,35 +126,99 @@ QString Validador::validarLicenciaDeImagen( QStringList datosExtraidos )
     vencimiento.replace( "I", "1", Qt::CaseInsensitive );
     vencimiento.replace( "Z", "2", Qt::CaseInsensitive );
 
+    QString clase = datosExtraidos.at( 7 );
+
     json.append( "{ \"dni\":\"" + dni );
     json.append( "\", \"apellido\":\"" + apellido );
     json.append( "\", \"nombre\":\"" + nombre );
-    json.append( "\", \"nacimiento\":\"" + nacimiento );
-    json.append( "\", \"otorgamiento\":\"" + otorgamiento );
-    json.append( "\", \"vencimiento\":\"" + vencimiento + "\" }" );
+    json.append( "\", \"domicilio\":\"" + domicilio );
+    json.append( "\", \"fecha_nac_licencia\":\"" + nacimiento );
+    json.append( "\", \"fecha_otorg_licencia\":\"" + otorgamiento );
+    json.append( "\", \"fecha_venc_licencia\":\"" + vencimiento );
+    json.append( "\", \"clase\":\"" + clase + "\" }" );
 
     return json;
 }
 
 QString Validador::validaDniDorso( QStringList datosExtraidos )
 {
-    // Domicilio / Nacimiento / Cuil / Linea1 / Linea2 / Linea3
+    // domicilio / lugar_nac / cuil / linea1 / linea2 / linea3
+    // o
+    // domicilioLinea1 / lineas / domicilioLinea2 / domicilioLinea3 (lugar de nacimiento)
 
     QString json;
 
+
+    // Si entra aca es solo porque devuelve domicilioLinea1 / lineas / domicilioLinea2 / domicilioLinea3
+    if ( datosExtraidos.size() == 4 )  {
+        QString domicilioLinea1 = datosExtraidos.at( 0 );
+        domicilioLinea1 = domicilioLinea1.mid( 0, domicilioLinea1.indexOf( "\n" ) );
+
+        QStringList lineasSeparadasDomicilio2 = datosExtraidos.at( 2 ).split( "\n" );
+
+        QString linea2_domicilio;
+
+        if ( lineasSeparadasDomicilio2.size() >= 2 )  {
+            linea2_domicilio = lineasSeparadasDomicilio2.at( 1 );
+        }
+
+        QStringList lineasSeparadasDomicilio3 = datosExtraidos.at( 3 ).split( "\n" );
+
+        QString linea3_lugar_nac;
+
+        if ( lineasSeparadasDomicilio3.size() >= 2 )  {
+            linea3_lugar_nac = lineasSeparadasDomicilio3.at( 2 );
+        }
+
+
+        QString lineas = datosExtraidos.at( 1 );
+        lineas.replace( " ", "" );  // Elimina todos los espacios entre la letras.
+        lineas.replace( "<K", "<<", Qt::CaseInsensitive );
+        lineas.replace( "K<", "<<", Qt::CaseInsensitive );
+        lineas.replace( "<X", "<<", Qt::CaseInsensitive );
+        lineas.replace( "X<", "<<", Qt::CaseInsensitive );
+
+        QStringList lineasSeparadas = lineas.split( "\n" );
+
+        if ( lineasSeparadas.size() == 4 )  {
+            json.append( "{ \"domicilio_dni\":\"" + domicilioLinea1 + " " + linea2_domicilio );
+            json.append( "\", \"lugar_nac\":\"" + linea3_lugar_nac );
+            json.append( "\", \"linea1\":\"" + lineasSeparadas.at( 0 ) );
+            json.append( "\", \"linea2\":\"" + lineasSeparadas.at( 1 ) );
+            json.append( "\", \"linea3\":\"" + lineasSeparadas.at( 2 ) + "\" }" );
+        }
+        else  {
+            json.append( "{ \"domicilio_dni\":\"" + domicilioLinea1 );
+            json.append( "\", \"lineas\":\"" + lineas + "\" }" );
+        }
+
+        return json;
+    }
+
     QString domicilio = datosExtraidos.at( 0 );
+    domicilio = domicilio.mid( 0, domicilio.indexOf( "\n" ) );
 
-    QString nacimiento = datosExtraidos.at( 1 );
 
-    QString cuil = datosExtraidos.at( 2 );
+    QString nacimiento = datosExtraidos.at( 1 ).simplified();
+
+    QString cuil = datosExtraidos.at( 2 ).simplified();
 
     QString linea1 = datosExtraidos.at( 3 );
+    linea1 = linea1.simplified();  // Elimina espacios al principio y fin, y tambien los enter, retorno de carro
+    linea1.replace( " ", "" );  // Elimina todos los espacios entre la letras.
+    linea1.replace( "<<", "" );  // Elimina todos los espacios entre la letras.
 
     QString linea2 = datosExtraidos.at( 4 );
+    linea2 = linea2.simplified();  // Elimina espacios al principio y fin, y tambien los enter, retorno de carro
+    linea2.replace( " ", "" );  // Elimina todos los espacios entre la letras.
+    linea2.replace( "<<<", "" );  // Elimina todos los espacios entre la letras.
 
     QString linea3 = datosExtraidos.at( 5 );
+    linea3 = linea3.simplified();  // Elimina espacios al principio y fin, y tambien los enter, retorno de carro
+    linea3.replace( " ", "" );  // Elimina todos los espacios entre la letras.
+    linea3.replace( "<<<", "" );  // Elimina todos los espacios entre la letras.
 
-    json.append( "{ \"domicilio\":\"" + domicilio );
+    json.append( "{ \"domicilio_dni\":\"" + domicilio );
     json.append( "\", \"nacimiento\":\"" + nacimiento );
     json.append( "\", \"cuil\":\"" + cuil );
     json.append( "\", \"linea1\":\"" + linea1 );
@@ -161,31 +230,22 @@ QString Validador::validaDniDorso( QStringList datosExtraidos )
 
 QString Validador::validaLicenciaDorso(QStringList datosExtraidos)
 {
-    // DescripcionLinea1 / DescripcionLinea2 / Donante / Sangre / Cuil / Observaciones / Restriccion
+    // clase / descripcionClase / descr_observ
 
     QString json;
 
-    QString descripcionLinea1 = datosExtraidos.at( 0 );
+    QString clase = datosExtraidos.at( 0 );
 
-    QString descripcionLinea2 = datosExtraidos.at( 1 );
+    QString descripcionClase = datosExtraidos.at( 1 );
+    descripcionClase.replace( "º", "o" );
 
-    QString donante = datosExtraidos.at( 2 );
+    QString descr_observ = datosExtraidos.at( 2 );
+    descr_observ.replace( "º", "o" );
 
-    QString sangre = datosExtraidos.at( 3 );
 
-    QString cuil = datosExtraidos.at( 4 );
-
-    QString observaciones = datosExtraidos.at( 5 );
-
-    QString restriccion = datosExtraidos.at( 6 );
-
-    json.append( "{ \"descripcionLinea1\":\"" + descripcionLinea1 );
-    json.append( "\", \"descripcionLinea2\":\"" + descripcionLinea2 );
-    json.append( "\", \"donante\":\"" + donante );
-    json.append( "\", \"sangre\":\"" + sangre );
-    json.append( "\", \"cuil\":\"" + cuil );
-    json.append( "\", \"observaciones\":\"" + observaciones );
-    json.append( "\", \"restriccion\":\"" + restriccion + "\" }" );
+    json.append( "{ \"clase\":\"" + clase );
+    json.append( "\", \"descripcion_clase\":\"" + descripcionClase );
+    json.append( "\", \"descr_observ\":\"" + descr_observ + "\" }" );
 
     return json;
 }
@@ -246,4 +306,29 @@ QString Validador::validaVerde(QStringList datosExtraidos)
 
     return json;
 
+}
+
+int Validador::levenshtein( const std::string & s1, const std::string & s2 )  {
+   int N1 = s1.size();
+   int N2 = s2.size();
+   int i, j;
+   std::vector< int > T( N2 + 1 );
+
+   for ( i = 0 ; i <= N2 ; i++ )
+      T[ i ] = i;
+
+   for ( i = 0 ; i < N1 ; i++ )  {
+      T[ 0 ] = i + 1;
+      int corner = i;
+
+      for ( j = 0 ; j < N2 ; j++ )  {
+         int upper = T[ j + 1 ];
+         if ( s1[ i ] == s2[ j ] )
+            T[ j + 1 ] = corner;
+         else
+            T[ j + 1 ] = std::min( T[ j ], std::min( upper, corner ) ) + 1;
+         corner = upper;
+      }
+   }
+   return T[ N2 ];
 }

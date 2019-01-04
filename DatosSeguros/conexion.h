@@ -4,6 +4,7 @@
 #include <QObject>
 
 #include <QTcpSocket>
+#include <QTimer>
 
 /**
  * @brief The Conexion class Esta clase representa y tiene la informacion de cada una de las conexiones de los
@@ -13,6 +14,8 @@ class Conexion : public QObject
 {
     Q_OBJECT
 public:
+    enum Estado { ESPERANDO_POST, RECIBIENDO_IMAGE, PROCESANDO_IMAGE };
+
     explicit Conexion(QObject *parent = nullptr);
 
     QTcpSocket *getTcpSocket() const;
@@ -38,6 +41,11 @@ public:
     QString getFecha_hora_foto() const;
     void setFecha_hora_foto(const QString &value);
 
+    Estado estado;
+
+    Estado getEstado() const;
+    void setEstado(const Estado &value);
+
 private:
     QTcpSocket * tcpSocket;
     QString tipo;  // Puede ser dni, licencia, verde (por defecto, ninguno)
@@ -50,9 +58,13 @@ private:
 
     QString fecha_hora_foto;
 
+    QTimer * timer;
+
+
 signals:
 
 public slots:
+    void slot_cerrarSocket();
 };
 
 #endif // CONEXION_H

@@ -20,6 +20,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QCryptographicHash>
+#include <QVector>
+#include <QStringList>
+#include <QSqlRecord>
 
 #include <stdexcept>
 
@@ -55,8 +58,19 @@ public:
     int login( QString user, QString password );
     int startSession( int adminId );
     int plateDetection(int sessionId);
-    int candidate(QString domain, QString matches, float confidence, int plateDetectionId);
+    int nuevaPersona(QString dni, QString apellido, QString nombre, QString sexo);
     int log(QString text, int level);
+    int actualizarPersona( QString dni, QString apellido, QString nombre, QString sexo );
+    QVector< QStringList > todasLasPersonas();
+
+    /**
+     * @brief procesarJson este metodo analiza los datos que hay en este json y hace todo lo que tenga que hacer.
+     * Si detecta una nueva persona, entonces crea una entrada nueva con clave dni, si ya existe, actualiza los datos. El json
+     * que este metodo recibe ya debe estar correctos.
+     * @param json
+     * @return
+     */
+    bool procesarJson( QString json );
 };
 
 #endif // DATABASE_HPP
